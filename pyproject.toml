@@ -1,0 +1,16 @@
+[project]
+name = "ghretos"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "arielle", email = "me@arielle.codes" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "yarl>=1.0",
+]
+
+[build-system]
+requires = ["flit_core>=3.2,<4"]
+build-backend = "flit_core.buildapi"
