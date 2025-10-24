@@ -1,60 +1,131 @@
+from calendar import c
+import collections
+import dataclasses
+
 import yarl
 
-
-import dataclasses
-import collections
-import collections.abc
-
+__all__ = (
+    "GitHubResource",
+    "User",
+    "Repo",
+    "Issue",
+    "IssueComment",
+    "IssueEvent",
+    "PullRequest",
+    "PullRequestComment",
+    "PullRequestReview",
+    "PullRequestReviewComment",
+    "PullRequestEvent",
+    "Discussion",
+    "DiscussionComment",
+    "Commit",
+    "CommitComment",
+    "ReleaseTag",
+    "MatcherSettings",
+    "parse_url",
+    "parse_shorthand",
+)
 
 @dataclasses.dataclass
-class ParsedResource:
+class GitHubResource:
     pass
 
 
 @dataclasses.dataclass
-class User(ParsedResource):
+class User(GitHubResource):
     login: str
 
 
 @dataclasses.dataclass
-class Repo(ParsedResource):
+class Repo(GitHubResource):
     name: str
     owner: User
 
+
 ## ISSUES
 @dataclasses.dataclass
-class Issue(ParsedResource):
+class Issue(GitHubResource):
     repo: Repo
     number: str
 
 
 @dataclasses.dataclass
-class IssueComment(ParsedResource):
+class IssueComment(GitHubResource):
     issue: Issue
     comment_id: str
 
-## PULL REQUESTS
 
 @dataclasses.dataclass
-class PullRequest(ParsedResource):
+class IssueEvent(GitHubResource):
+    issue: Issue
+    event_id: str
+
+
+## PULL REQUESTS
+
+
+@dataclasses.dataclass
+class PullRequest(GitHubResource):
     repo: Repo
     number: str
 
 
 @dataclasses.dataclass
-class PullRequestComment(ParsedResource):
+class PullRequestComment(GitHubResource):
     pull_request: PullRequest
     comment_id: str
 
 
 @dataclasses.dataclass
-class Discussion(ParsedResource):
+class PullRequestReview(GitHubResource):
+    pull_request: PullRequest
+    comment_id: str
+
+
+@dataclasses.dataclass
+class PullRequestReviewComment(GitHubResource):
+    pull_request: PullRequest
+    comment_id: str
+
+
+@dataclasses.dataclass
+class PullRequestEvent(GitHubResource):
+    pull_request: PullRequest
+    event_id: str
+
+
+### DISCUSSIONS
+
+
+@dataclasses.dataclass
+class Discussion(GitHubResource):
     repo: Repo
     number: str
 
 
 @dataclasses.dataclass
-class ReleaseTag(ParsedResource):
+class DiscussionComment(GitHubResource):
+    discussion: Discussion
+    comment_id: str
+
+
+## COMMITS
+
+
+@dataclasses.dataclass
+class Commit(GitHubResource):
+    repo: Repo
+    sha: str
+
+
+@dataclasses.dataclass
+class CommitComment(GitHubResource):
+    commit: Commit
+    comment_id: str
+
+
+@dataclasses.dataclass
+class ReleaseTag(GitHubResource):
     repo: Repo
     tag: str
 
@@ -67,7 +138,7 @@ class MatcherSettings:
 _DEFAULT_MATCHER_SETTINGS = MatcherSettings()
 
 
-def _get_comment_id_from_fragment(url: yarl.URL, prefix: str) -> str | None:
+def _get_id_from_fragment(url: yarl.URL, prefix: str) -> str | None:
     fragment = url.fragment
     if fragment.startswith(prefix):
         return fragment[len(prefix) :]
@@ -76,10 +147,10 @@ def _get_comment_id_from_fragment(url: yarl.URL, prefix: str) -> str | None:
 
 # TODO: check yarl documentation regarding encoded or decoded values
 def parse_url(
-    url: str,
+    url: str | yarl.URL,
     *,
     settings: MatcherSettings = _DEFAULT_MATCHER_SETTINGS,
-) -> ParsedResource | None:
+) -> GitHubResource | None:
     """Parses a GitHub URL into its corresponding resource.
 
     This parses the following URL types:
@@ -104,7 +175,10 @@ def parse_url(
         A ParsedResource instance if the URL corresponds to a known GitHub resource,
         None otherwise.
     """
-    parsed_url = yarl.URL(url)
+    if not isinstance(url, yarl.URL):
+        parsed_url = yarl.URL(url)
+    else:
+        parsed_url = url
     if (
         not parsed_url.absolute
         or parsed_url.host_port_subcomponent not in settings.domains
@@ -112,7 +186,7 @@ def parse_url(
         return None
     # parts consists of a slash at the front plus each path segments
     parts = collections.deque(parsed_url.parts)
-    if parts:
+    if not parts:
         return None
     _ = parts.popleft()  # remove leading slash
     user = parts.popleft()
@@ -138,6 +212,8 @@ def parse_url(
     # Commit Comment: /{owner}/{repo}/commit/{commit_sha}#commitcomment-{comment_id}
 
     # issues and pull requests also support events
+    # Issue Event: /{owner}/{repo}/issues/{issue_number}#event-{event_id}
+    # Pull Request Event: /{owner}/{repo}/pull/{pr_number}#event-{event_id}
 
     # Pull Requests support reviews and review comments:
     # /{owner}/{repo}/pull/{pr_number}#pullrequestreview-3373902296
@@ -156,20 +232,66 @@ def parse_url(
         "releases",
     ):
         return None
-
     if resource_type == "releases":
         # only tag subresource is supported
         if not parts or parts.popleft() != "tag":
             return None
-        # we don't currently have a type for tags
-        return None
+        if not parts:
+            return None
+        tag = parts.popleft()
+        return ReleaseTag(repo=repo, tag=tag)
+
+    match resource_type:
+        case "issues":
+            issue_number = parts.popleft()
+            issue = Issue(repo=repo, number=issue_number)
+            comment_id = _get_id_from_fragment(parsed_url, "issuecomment-")
+            if comment_id is not None:
+                return IssueComment(issue=issue, comment_id=comment_id)
+            event_id = _get_id_from_fragment(parsed_url, "event-")
+            if event_id is not None:
+                return IssueEvent(issue=issue, event_id=event_id)
+            return issue
+        case "pull":
+            pull_number = parts.popleft()
+            pull = PullRequest(repo=repo, number=pull_number)
+            comment_id = _get_id_from_fragment(parsed_url, "issuecomment-")
+            if comment_id is not None:
+                return PullRequestComment(pull_request=pull, comment_id=comment_id)
+            if (
+                review_id := _get_id_from_fragment(parsed_url, "pullrequestreview-")
+            ) is not None:
+                return PullRequestReview(pull_request=pull, comment_id=review_id)
+            if review_comment_id := _get_id_from_fragment(parsed_url, "discussion_r"):
+                return PullRequestReviewComment(
+                    pull_request=pull, comment_id=review_comment_id
+                )
+
+            event_id = _get_id_from_fragment(parsed_url, "event-")
+            if event_id is not None:
+                return PullRequestEvent(pull_request=pull, event_id=event_id)
+            return pull
+        case "discussions":
+            discussion_number = parts.popleft()
+            discussion = Discussion(repo=repo, number=discussion_number)
+            comment_id = _get_id_from_fragment(parsed_url, "discussioncomment-")
+            if comment_id is not None:
+                return DiscussionComment(discussion=discussion, comment_id=comment_id)
+            return discussion
+        case "commit":
+            sha = parts.popleft()
+            commit = Commit(repo=repo, sha=sha)
+            comment_id = _get_id_from_fragment(parsed_url, "commitcomment-")
+            if comment_id is not None:
+                return CommitComment(commit=commit, comment_id=comment_id)
+            return commit
 
 
 def parse_shorthand(
     shorthand: str,
     *,
     default_user: str | None = None,
-) -> ParsedResource | None:
+) -> GitHubResource | None:
     """
     Parses a shorthand notation for a GitHub resource.
 
