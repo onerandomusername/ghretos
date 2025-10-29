@@ -26,6 +26,7 @@ __all__ = (
     "parse_shorthand",
 )
 
+
 @dataclasses.dataclass
 class GitHubResource:
     pass
@@ -39,7 +40,9 @@ class User(GitHubResource):
 @dataclasses.dataclass
 class Repo(GitHubResource):
     name: str
-    owner: User
+
+    # flattened user
+    user: str
 
 
 ## ISSUES
@@ -50,14 +53,12 @@ class Issue(GitHubResource):
 
 
 @dataclasses.dataclass
-class IssueComment(GitHubResource):
-    issue: Issue
+class IssueComment(Issue):
     comment_id: str
 
 
 @dataclasses.dataclass
-class IssueEvent(GitHubResource):
-    issue: Issue
+class IssueEvent(Issue):
     event_id: str
 
 
@@ -71,26 +72,22 @@ class PullRequest(GitHubResource):
 
 
 @dataclasses.dataclass
-class PullRequestComment(GitHubResource):
-    pull_request: PullRequest
+class PullRequestComment(PullRequest):
     comment_id: str
 
 
 @dataclasses.dataclass
-class PullRequestReview(GitHubResource):
-    pull_request: PullRequest
+class PullRequestReview(PullRequest):
+    review_id: str
+
+
+@dataclasses.dataclass
+class PullRequestReviewComment(PullRequest):
     comment_id: str
 
 
 @dataclasses.dataclass
-class PullRequestReviewComment(GitHubResource):
-    pull_request: PullRequest
-    comment_id: str
-
-
-@dataclasses.dataclass
-class PullRequestEvent(GitHubResource):
-    pull_request: PullRequest
+class PullRequestEvent(PullRequest):
     event_id: str
 
 
@@ -104,8 +101,7 @@ class Discussion(GitHubResource):
 
 
 @dataclasses.dataclass
-class DiscussionComment(GitHubResource):
-    discussion: Discussion
+class DiscussionComment(Discussion):
     comment_id: str
 
 
@@ -119,8 +115,7 @@ class Commit(GitHubResource):
 
 
 @dataclasses.dataclass
-class CommitComment(GitHubResource):
-    commit: Commit
+class CommitComment(Commit):
     comment_id: str
 
 
@@ -190,12 +185,11 @@ def parse_url(
         return None
     _ = parts.popleft()  # remove leading slash
     user = parts.popleft()
-    owner = User(login=user)
     if not parts:
-        return owner
+        return User(login=user)
     # parts is now [/, user, repo, ...]
     repo_name = parts.popleft()
-    repo = Repo(name=repo_name, owner=owner)
+    repo = Repo(name=repo_name, user=user)
     if not parts:
         return repo
     # GitHub's api schema for (supported) types are the following:
@@ -244,47 +238,53 @@ def parse_url(
     match resource_type:
         case "issues":
             issue_number = parts.popleft()
-            issue = Issue(repo=repo, number=issue_number)
             comment_id = _get_id_from_fragment(parsed_url, "issuecomment-")
             if comment_id is not None:
-                return IssueComment(issue=issue, comment_id=comment_id)
+                return IssueComment(
+                    repo=repo, number=issue_number, comment_id=comment_id
+                )
             event_id = _get_id_from_fragment(parsed_url, "event-")
             if event_id is not None:
-                return IssueEvent(issue=issue, event_id=event_id)
-            return issue
+                return IssueEvent(repo=repo, number=issue_number, event_id=event_id)
+            return Issue(repo=repo, number=issue_number)
         case "pull":
             pull_number = parts.popleft()
-            pull = PullRequest(repo=repo, number=pull_number)
             comment_id = _get_id_from_fragment(parsed_url, "issuecomment-")
             if comment_id is not None:
-                return PullRequestComment(pull_request=pull, comment_id=comment_id)
+                return PullRequestComment(
+                    repo=repo, number=pull_number, comment_id=comment_id
+                )
             if (
                 review_id := _get_id_from_fragment(parsed_url, "pullrequestreview-")
             ) is not None:
-                return PullRequestReview(pull_request=pull, comment_id=review_id)
+                return PullRequestReview(
+                    repo=repo, number=pull_number, review_id=review_id
+                )
             if review_comment_id := _get_id_from_fragment(parsed_url, "discussion_r"):
                 return PullRequestReviewComment(
-                    pull_request=pull, comment_id=review_comment_id
+                    repo=repo, number=pull_number, comment_id=review_comment_id
                 )
 
             event_id = _get_id_from_fragment(parsed_url, "event-")
             if event_id is not None:
-                return PullRequestEvent(pull_request=pull, event_id=event_id)
-            return pull
+                return PullRequestEvent(
+                    repo=repo, number=pull_number, event_id=event_id
+                )
+            return PullRequest(repo=repo, number=pull_number)
         case "discussions":
             discussion_number = parts.popleft()
-            discussion = Discussion(repo=repo, number=discussion_number)
             comment_id = _get_id_from_fragment(parsed_url, "discussioncomment-")
             if comment_id is not None:
-                return DiscussionComment(discussion=discussion, comment_id=comment_id)
-            return discussion
+                return DiscussionComment(
+                    repo=repo, number=discussion_number, comment_id=comment_id
+                )
+            return Discussion(repo=repo, number=discussion_number)
         case "commit":
             sha = parts.popleft()
-            commit = Commit(repo=repo, sha=sha)
             comment_id = _get_id_from_fragment(parsed_url, "commitcomment-")
             if comment_id is not None:
-                return CommitComment(commit=commit, comment_id=comment_id)
-            return commit
+                return CommitComment(repo=repo, sha=sha, comment_id=comment_id)
+            return Commit(repo=repo, sha=sha)
 
 
 def parse_shorthand(
