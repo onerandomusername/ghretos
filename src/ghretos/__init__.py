@@ -1,4 +1,3 @@
-from calendar import c
 import collections
 import dataclasses
 
@@ -308,3 +307,29 @@ def parse_shorthand(
     No requests are made to GitHub; this is purely syntactic parsing.
     No validation is performed on the parsed values, they are simply returned as-is.
     """
+    # Iterate once.
+    user: str = ""
+    repo: str = ""
+    ref_type: str = ""
+
+    if "/" in shorthand:
+        user, shorthand = shorthand.split("/", 1)
+    elif default_user is None:
+        return None
+    else:
+        user = default_user
+
+    for char in shorthand:
+        if char in ("#", "@"):
+            ref_type = char
+            break
+        repo += char
+    else:
+        return Repo(name=repo, user=user)
+    
+    ref = shorthand[len(repo) + 1 :]
+    if ref_type == "#":
+        return Issue(repo=Repo(name=repo, user=user), number=ref)
+    elif ref_type == "@":
+        return ReleaseTag(repo=Repo(name=repo, user=user), tag=ref)
+    return None
