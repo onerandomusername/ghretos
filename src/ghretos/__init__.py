@@ -1,5 +1,6 @@
 import collections
 import dataclasses
+import string
 
 import yarl
 
@@ -237,8 +238,9 @@ def parse_url(
     match resource_type:
         case "issues":
             issue_number = parts.popleft()
-            comment_id = _get_id_from_fragment(parsed_url, "issuecomment-")
-            if comment_id is not None:
+            if (
+                comment_id := _get_id_from_fragment(parsed_url, "issuecomment-")
+            ) and comment_id.isdigit():
                 return IssueComment(
                     repo=repo, number=issue_number, comment_id=comment_id
                 )
@@ -248,24 +250,27 @@ def parse_url(
             return Issue(repo=repo, number=issue_number)
         case "pull":
             pull_number = parts.popleft()
-            comment_id = _get_id_from_fragment(parsed_url, "issuecomment-")
-            if comment_id is not None:
+            if (
+                comment_id := _get_id_from_fragment(parsed_url, "issuecomment-")
+            ) and comment_id.isdigit():
                 return PullRequestComment(
                     repo=repo, number=pull_number, comment_id=comment_id
                 )
             if (
                 review_id := _get_id_from_fragment(parsed_url, "pullrequestreview-")
-            ) is not None:
+            ) and review_id.isdigit():
                 return PullRequestReview(
                     repo=repo, number=pull_number, review_id=review_id
                 )
-            if review_comment_id := _get_id_from_fragment(parsed_url, "discussion_r"):
+            if (
+                review_comment_id := _get_id_from_fragment(parsed_url, "discussion_r")
+            ) and review_comment_id.isdigit():
                 return PullRequestReviewComment(
                     repo=repo, number=pull_number, comment_id=review_comment_id
                 )
 
             event_id = _get_id_from_fragment(parsed_url, "event-")
-            if event_id is not None:
+            if event_id is not None and event_id.isdigit():
                 return PullRequestEvent(
                     repo=repo, number=pull_number, event_id=event_id
                 )
@@ -273,7 +278,7 @@ def parse_url(
         case "discussions":
             discussion_number = parts.popleft()
             comment_id = _get_id_from_fragment(parsed_url, "discussioncomment-")
-            if comment_id is not None:
+            if comment_id is not None and comment_id.isdigit():
                 return DiscussionComment(
                     repo=repo, number=discussion_number, comment_id=comment_id
                 )
@@ -281,7 +286,7 @@ def parse_url(
         case "commit":
             sha = parts.popleft()
             comment_id = _get_id_from_fragment(parsed_url, "commitcomment-")
-            if comment_id is not None:
+            if comment_id is not None and comment_id.isdigit():
                 return CommitComment(repo=repo, sha=sha, comment_id=comment_id)
             return Commit(repo=repo, sha=sha)
 
@@ -326,9 +331,11 @@ def parse_shorthand(
         repo += char
     else:
         return Repo(name=repo, user=user)
-    
+
     ref = shorthand[len(repo) + 1 :]
     if ref_type == "#":
+        if not ref.isdigit():
+            return None
         return Issue(repo=Repo(name=repo, user=user), number=ref)
     elif ref_type == "@":
         return ReleaseTag(repo=Repo(name=repo, user=user), tag=ref)
