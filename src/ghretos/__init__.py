@@ -1,6 +1,5 @@
 import collections
 import dataclasses
-import string
 
 import yarl
 
@@ -27,99 +26,127 @@ __all__ = (
 )
 
 
-@dataclasses.dataclass
 class GitHubResource:
     pass
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class User(GitHubResource):
     login: str
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
 class Repo(GitHubResource):
     name: str
 
     # flattened user
-    user: str
+    owner: str
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.owner}/{self.name}"
+
+    @property
+    def html_url(self) -> str:
+        return f"https://github.com/{self.full_name}"
 
 
 ## ISSUES
-@dataclasses.dataclass
-class Issue(GitHubResource):
+@dataclasses.dataclass(unsafe_hash=True)
+class _Issue(GitHubResource):
     repo: Repo
-    number: str
+    number: int
 
 
-@dataclasses.dataclass
-class IssueComment(Issue):
-    comment_id: str
+@dataclasses.dataclass(unsafe_hash=True)
+class Issue(_Issue):
+    pass
 
 
-@dataclasses.dataclass
-class IssueEvent(Issue):
-    event_id: str
+@dataclasses.dataclass(unsafe_hash=True)
+class IssueComment(_Issue):
+    comment_id: int
+
+
+@dataclasses.dataclass(unsafe_hash=True)
+class IssueEvent(_Issue):
+    event_id: int
 
 
 ## PULL REQUESTS
 
 
-@dataclasses.dataclass
-class PullRequest(GitHubResource):
+@dataclasses.dataclass(unsafe_hash=True)
+class _PullRequest(GitHubResource):
     repo: Repo
-    number: str
+    number: int
 
 
-@dataclasses.dataclass
-class PullRequestComment(PullRequest):
-    comment_id: str
+@dataclasses.dataclass(unsafe_hash=True)
+class PullRequest(_PullRequest):
+    pass
 
 
-@dataclasses.dataclass
-class PullRequestReview(PullRequest):
-    review_id: str
+@dataclasses.dataclass(unsafe_hash=True)
+class PullRequestComment(_PullRequest):
+    comment_id: int
 
 
-@dataclasses.dataclass
-class PullRequestReviewComment(PullRequest):
-    comment_id: str
+@dataclasses.dataclass(unsafe_hash=True)
+class PullRequestReview(_PullRequest):
+    review_id: int
 
 
-@dataclasses.dataclass
-class PullRequestEvent(PullRequest):
-    event_id: str
+@dataclasses.dataclass(unsafe_hash=True)
+class PullRequestReviewComment(_PullRequest):
+    comment_id: int
+
+
+@dataclasses.dataclass(unsafe_hash=True)
+class PullRequestEvent(_PullRequest):
+    event_id: int
 
 
 ### DISCUSSIONS
 
 
-@dataclasses.dataclass
-class Discussion(GitHubResource):
+@dataclasses.dataclass(unsafe_hash=True)
+class _Discussion(GitHubResource):
     repo: Repo
-    number: str
+    number: int
 
 
-@dataclasses.dataclass
-class DiscussionComment(Discussion):
-    comment_id: str
+@dataclasses.dataclass(unsafe_hash=True)
+class Discussion(_Discussion):
+    repo: Repo
+    number: int
+
+
+@dataclasses.dataclass(unsafe_hash=True)
+class DiscussionComment(_Discussion):
+    comment_id: int
 
 
 ## COMMITS
 
 
-@dataclasses.dataclass
-class Commit(GitHubResource):
+@dataclasses.dataclass(unsafe_hash=True)
+class _Commit(GitHubResource):
     repo: Repo
     sha: str
 
 
-@dataclasses.dataclass
-class CommitComment(Commit):
-    comment_id: str
+@dataclasses.dataclass(unsafe_hash=True)
+class Commit(_Commit):
+    pass
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(unsafe_hash=True)
+class CommitComment(_Commit):
+    comment_id: int
+
+
+@dataclasses.dataclass(unsafe_hash=True)
 class ReleaseTag(GitHubResource):
     repo: Repo
     tag: str
@@ -189,7 +216,7 @@ def parse_url(
         return User(login=user)
     # parts is now [/, user, repo, ...]
     repo_name = parts.popleft()
-    repo = Repo(name=repo_name, user=user)
+    repo = Repo(name=repo_name, owner=user)
     if not parts:
         return repo
     # GitHub's api schema for (supported) types are the following:
@@ -238,56 +265,67 @@ def parse_url(
     match resource_type:
         case "issues":
             issue_number = parts.popleft()
+            if not issue_number.isdigit():
+                return None
+            issue_number = int(issue_number)
             if (
                 comment_id := _get_id_from_fragment(parsed_url, "issuecomment-")
             ) and comment_id.isdigit():
                 return IssueComment(
-                    repo=repo, number=issue_number, comment_id=comment_id
+                    repo=repo, number=issue_number, comment_id=int(comment_id)
                 )
             event_id = _get_id_from_fragment(parsed_url, "event-")
-            if event_id is not None:
-                return IssueEvent(repo=repo, number=issue_number, event_id=event_id)
+            if event_id is not None and event_id.isdigit():
+                return IssueEvent(
+                    repo=repo, number=issue_number, event_id=int(event_id)
+                )
             return Issue(repo=repo, number=issue_number)
         case "pull":
             pull_number = parts.popleft()
+            if not pull_number.isdigit():
+                return None
+            pull_number = int(pull_number)
             if (
                 comment_id := _get_id_from_fragment(parsed_url, "issuecomment-")
             ) and comment_id.isdigit():
                 return PullRequestComment(
-                    repo=repo, number=pull_number, comment_id=comment_id
+                    repo=repo, number=pull_number, comment_id=int(comment_id)
                 )
             if (
                 review_id := _get_id_from_fragment(parsed_url, "pullrequestreview-")
             ) and review_id.isdigit():
                 return PullRequestReview(
-                    repo=repo, number=pull_number, review_id=review_id
+                    repo=repo, number=pull_number, review_id=int(review_id)
                 )
             if (
                 review_comment_id := _get_id_from_fragment(parsed_url, "discussion_r")
             ) and review_comment_id.isdigit():
                 return PullRequestReviewComment(
-                    repo=repo, number=pull_number, comment_id=review_comment_id
+                    repo=repo, number=pull_number, comment_id=int(review_comment_id)
                 )
 
             event_id = _get_id_from_fragment(parsed_url, "event-")
             if event_id is not None and event_id.isdigit():
                 return PullRequestEvent(
-                    repo=repo, number=pull_number, event_id=event_id
+                    repo=repo, number=pull_number, event_id=int(event_id)
                 )
             return PullRequest(repo=repo, number=pull_number)
         case "discussions":
             discussion_number = parts.popleft()
+            if not discussion_number.isdigit():
+                return None
+            discussion_number = int(discussion_number)
             comment_id = _get_id_from_fragment(parsed_url, "discussioncomment-")
             if comment_id is not None and comment_id.isdigit():
                 return DiscussionComment(
-                    repo=repo, number=discussion_number, comment_id=comment_id
+                    repo=repo, number=discussion_number, comment_id=int(comment_id)
                 )
             return Discussion(repo=repo, number=discussion_number)
         case "commit":
             sha = parts.popleft()
             comment_id = _get_id_from_fragment(parsed_url, "commitcomment-")
             if comment_id is not None and comment_id.isdigit():
-                return CommitComment(repo=repo, sha=sha, comment_id=comment_id)
+                return CommitComment(repo=repo, sha=sha, comment_id=int(comment_id))
             return Commit(repo=repo, sha=sha)
 
 
@@ -330,13 +368,13 @@ def parse_shorthand(
             break
         repo += char
     else:
-        return Repo(name=repo, user=user)
+        return Repo(name=repo, owner=user)
 
     ref = shorthand[len(repo) + 1 :]
     if ref_type == "#":
         if not ref.isdigit():
             return None
-        return Issue(repo=Repo(name=repo, user=user), number=ref)
+        return Issue(repo=Repo(name=repo, owner=user), number=int(ref))
     elif ref_type == "@":
-        return ReleaseTag(repo=Repo(name=repo, user=user), tag=ref)
+        return ReleaseTag(repo=Repo(name=repo, owner=user), tag=ref)
     return None
