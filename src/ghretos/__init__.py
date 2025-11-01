@@ -63,13 +63,16 @@ class Repo(GitHubResource):
     def html_url(self) -> str:
         return f"https://github.com/{self.full_name}"
 
+
 @dataclass_deco
 class NumberedResource(GitHubResource):
     """Special base class for resources with numbers.
-    
+
     This is used for shorthand parsing for numbered resources, where the specific type is not known."""
+
     repo: Repo
     number: int
+
 
 ## ISSUES
 @dataclass_deco
@@ -120,6 +123,13 @@ class PullRequestReview(_PullRequest):
 @dataclass_deco
 class PullRequestReviewComment(_PullRequest):
     comment_id: int
+
+    # these comments are special and can live on multiple pages:
+    # pull/<num>/commits/<sha>#r<ID>
+    # pull/files#r<ID>
+    sha: str | None = None
+    commit_page: bool = False
+    files_page: bool = False
 
 
 @dataclass_deco
@@ -303,6 +313,42 @@ def parse_url(
             return Issue(repo=repo, number=issue_number)
         case "pull":
             pull_number = parts.popleft()
+            # validate that parts is empty:
+            if parts:
+                next_part = parts.popleft()
+                if next_part not in ("commits", "files"):
+                    return None
+                if next_part == "commits":
+                    # pull/<num>/commits/<sha>#r<ID>
+                    if not parts:
+                        return None
+                    sha = parts.popleft()
+                    if parts:
+                        return None
+                    comment_id = _get_id_from_fragment(parsed_url, "r")
+                    if comment_id is not None and comment_id.isdigit():
+                        return PullRequestReviewComment(
+                            repo=repo,
+                            number=int(pull_number),
+                            comment_id=int(comment_id),
+                            sha=sha,
+                            commit_page=True,
+                        )
+                    return None  # no other resource supported on this page
+                elif next_part == "files":
+                    # pull/files#r<ID>
+                    if parts:
+                        return None
+                    comment_id = _get_id_from_fragment(parsed_url, "r")
+                    if comment_id is not None and comment_id.isdigit():
+                        return PullRequestReviewComment(
+                            repo=repo,
+                            number=int(pull_number),
+                            comment_id=int(comment_id),
+                            files_page=True,
+                        )
+                    return None  # no other resource supported on this page
+
             if not pull_number.isdigit():
                 return None
             pull_number = int(pull_number)
@@ -324,7 +370,6 @@ def parse_url(
                 return PullRequestReviewComment(
                     repo=repo, number=pull_number, comment_id=int(review_comment_id)
                 )
-
             event_id = _get_id_from_fragment(parsed_url, "event-")
             if event_id is not None and event_id.isdigit():
                 return PullRequestEvent(
