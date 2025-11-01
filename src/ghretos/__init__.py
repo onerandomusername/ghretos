@@ -2,9 +2,13 @@ import collections
 import dataclasses
 import functools
 import string
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import yarl
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
+
 
 __all__ = (
     "GitHubResource",
@@ -185,6 +189,60 @@ class ReleaseTag(GitHubResource):
 @dataclasses.dataclass
 class MatcherSettings:
     domains: list[str] = dataclasses.field(default_factory=lambda: ["github.com"])
+    issues: bool = True
+    issue_comments: bool = True
+    issue_events: bool = True
+    pull_requests: bool = True
+    pull_request_comments: bool = True
+    pull_request_reviews: bool = True
+    pull_request_review_comments: bool = True
+    pull_request_events: bool = True
+    discussions: bool = True
+    discussion_comments: bool = True
+    commits: bool = True
+    commit_comments: bool = True
+    releases: bool = True
+
+    shorthand: bool = True
+    short_repo: bool = True
+    short_numberables: bool = True
+    short_refs: bool = True
+
+    @classmethod
+    def none(cls) -> "Self":
+        return cls(
+            issues=False,
+            issue_comments=False,
+            issue_events=False,
+            pull_requests=False,
+            pull_request_comments=False,
+            pull_request_reviews=False,
+            pull_request_review_comments=False,
+            pull_request_events=False,
+            discussions=False,
+            discussion_comments=False,
+            commits=False,
+            commit_comments=False,
+            releases=False,
+            shorthand=False,
+            short_repo=False,
+            short_numberables=False,
+            short_refs=False,
+        )
+
+    def _supported_resource_types(self) -> set[str]:
+        types: set[str] = set()
+        if self.issues:
+            types.add("issues")
+        if self.pull_requests:
+            types.add("pull")
+        if self.discussions:
+            types.add("discussions")
+        if self.commits:
+            types.add("commit")
+        if self.releases:
+            types.add("releases")
+        return types
 
 
 _DEFAULT_MATCHER_SETTINGS = MatcherSettings()
@@ -276,13 +334,8 @@ def parse_url(
 
     # Case normalisation is not performed on GitHub's end, so we do not do it here either.
     resource_type = parts.popleft()
-    if resource_type not in (
-        "issues",
-        "pull",
-        "discussions",
-        "commit",
-        "releases",
-    ):
+    # Set supported resource types based on settings
+    if resource_type not in settings._supported_resource_types():
         return None
     if resource_type == "releases":
         # only tag subresource is supported
@@ -302,15 +355,21 @@ def parse_url(
             if (
                 comment_id := _get_id_from_fragment(parsed_url, "issuecomment-")
             ) and comment_id.isdigit():
-                return IssueComment(
-                    repo=repo, number=issue_number, comment_id=int(comment_id)
+                return (
+                    IssueComment(
+                        repo=repo, number=issue_number, comment_id=int(comment_id)
+                    )
+                    if settings.issue_comments
+                    else None
                 )
             event_id = _get_id_from_fragment(parsed_url, "event-")
             if event_id is not None and event_id.isdigit():
-                return IssueEvent(
-                    repo=repo, number=issue_number, event_id=int(event_id)
+                return (
+                    IssueEvent(repo=repo, number=issue_number, event_id=int(event_id))
+                    if settings.issue_events
+                    else None
                 )
-            return Issue(repo=repo, number=issue_number)
+            return Issue(repo=repo, number=issue_number) if settings.issues else None
         case "pull":
             pull_number = parts.popleft()
             # validate that parts is empty:
@@ -327,12 +386,16 @@ def parse_url(
                         return None
                     comment_id = _get_id_from_fragment(parsed_url, "r")
                     if comment_id is not None and comment_id.isdigit():
-                        return PullRequestReviewComment(
-                            repo=repo,
-                            number=int(pull_number),
-                            comment_id=int(comment_id),
-                            sha=sha,
-                            commit_page=True,
+                        return (
+                            PullRequestReviewComment(
+                                repo=repo,
+                                number=int(pull_number),
+                                comment_id=int(comment_id),
+                                sha=sha,
+                                commit_page=True,
+                            )
+                            if settings.pull_request_review_comments
+                            else None
                         )
                     return None  # no other resource supported on this page
                 elif next_part == "files":
@@ -341,11 +404,15 @@ def parse_url(
                         return None
                     comment_id = _get_id_from_fragment(parsed_url, "r")
                     if comment_id is not None and comment_id.isdigit():
-                        return PullRequestReviewComment(
-                            repo=repo,
-                            number=int(pull_number),
-                            comment_id=int(comment_id),
-                            files_page=True,
+                        return (
+                            PullRequestReviewComment(
+                                repo=repo,
+                                number=int(pull_number),
+                                comment_id=int(comment_id),
+                                files_page=True,
+                            )
+                            if settings.pull_request_review_comments
+                            else None
                         )
                     return None  # no other resource supported on this page
 
@@ -355,25 +422,41 @@ def parse_url(
             if (
                 comment_id := _get_id_from_fragment(parsed_url, "issuecomment-")
             ) and comment_id.isdigit():
-                return PullRequestComment(
-                    repo=repo, number=pull_number, comment_id=int(comment_id)
+                return (
+                    PullRequestComment(
+                        repo=repo, number=pull_number, comment_id=int(comment_id)
+                    )
+                    if settings.pull_request_comments
+                    else None
                 )
             if (
                 review_id := _get_id_from_fragment(parsed_url, "pullrequestreview-")
             ) and review_id.isdigit():
-                return PullRequestReview(
-                    repo=repo, number=pull_number, review_id=int(review_id)
+                return (
+                    PullRequestReview(
+                        repo=repo, number=pull_number, review_id=int(review_id)
+                    )
+                    if settings.pull_request_reviews
+                    else None
                 )
             if (
                 review_comment_id := _get_id_from_fragment(parsed_url, "discussion_r")
             ) and review_comment_id.isdigit():
-                return PullRequestReviewComment(
-                    repo=repo, number=pull_number, comment_id=int(review_comment_id)
+                return (
+                    PullRequestReviewComment(
+                        repo=repo, number=pull_number, comment_id=int(review_comment_id)
+                    )
+                    if settings.pull_request_review_comments
+                    else None
                 )
             event_id = _get_id_from_fragment(parsed_url, "event-")
             if event_id is not None and event_id.isdigit():
-                return PullRequestEvent(
-                    repo=repo, number=pull_number, event_id=int(event_id)
+                return (
+                    PullRequestEvent(
+                        repo=repo, number=pull_number, event_id=int(event_id)
+                    )
+                    if settings.pull_request_events
+                    else None
                 )
             return PullRequest(repo=repo, number=pull_number)
         case "discussions":
@@ -383,22 +466,35 @@ def parse_url(
             discussion_number = int(discussion_number)
             comment_id = _get_id_from_fragment(parsed_url, "discussioncomment-")
             if comment_id is not None and comment_id.isdigit():
-                return DiscussionComment(
-                    repo=repo, number=discussion_number, comment_id=int(comment_id)
+                return (
+                    DiscussionComment(
+                        repo=repo, number=discussion_number, comment_id=int(comment_id)
+                    )
+                    if settings.discussion_comments
+                    else None
                 )
-            return Discussion(repo=repo, number=discussion_number)
+            return (
+                Discussion(repo=repo, number=discussion_number)
+                if settings.discussions
+                else None
+            )
         case "commit":
             sha = parts.popleft()
             comment_id = _get_id_from_fragment(parsed_url, "commitcomment-")
             if comment_id is not None and comment_id.isdigit():
-                return CommitComment(repo=repo, sha=sha, comment_id=int(comment_id))
-            return Commit(repo=repo, sha=sha)
+                return (
+                    CommitComment(repo=repo, sha=sha, comment_id=int(comment_id))
+                    if settings.commit_comments
+                    else None
+                )
+            return Commit(repo=repo, sha=sha) if settings.commits else None
 
 
 def parse_shorthand(
     shorthand: str,
     *,
     default_user: str | None = None,
+    settings: MatcherSettings = _DEFAULT_MATCHER_SETTINGS,
 ) -> GitHubResource | None:
     """
     Parses a shorthand notation for a GitHub resource.
@@ -416,6 +512,8 @@ def parse_shorthand(
     No requests are made to GitHub; this is purely syntactic parsing.
     No validation is performed on the parsed values, they are simply returned as-is.
     """
+    if not settings.shorthand:
+        return None
     # Iterate once.
     user: str = ""
     repo: str = ""
@@ -441,13 +539,21 @@ def parse_shorthand(
             return None
         repo += char
     else:
-        return Repo(name=repo, owner=user)
+        return Repo(name=repo, owner=user) if settings.short_repo else None
 
     ref = shorthand[len(repo) + 1 :]
     if ref_type == "#":
         if not ref.isdigit():
             return None
-        return NumberedResource(repo=Repo(name=repo, owner=user), number=int(ref))
+        return (
+            NumberedResource(repo=Repo(name=repo, owner=user), number=int(ref))
+            if settings.short_numberables
+            else None
+        )
     elif ref_type == "@":
-        return ReleaseTag(repo=Repo(name=repo, owner=user), tag=ref)
+        return (
+            ReleaseTag(repo=Repo(name=repo, owner=user), tag=ref)
+            if settings.short_refs
+            else None
+        )
     return None
