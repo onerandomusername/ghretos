@@ -63,6 +63,13 @@ class Repo(GitHubResource):
     def html_url(self) -> str:
         return f"https://github.com/{self.full_name}"
 
+@dataclass_deco
+class NumberedResource(GitHubResource):
+    """Special base class for resources with numbers.
+    
+    This is used for shorthand parsing for numbered resources, where the specific type is not known."""
+    repo: Repo
+    number: int
 
 ## ISSUES
 @dataclass_deco
@@ -395,7 +402,7 @@ def parse_shorthand(
     if ref_type == "#":
         if not ref.isdigit():
             return None
-        return Issue(repo=Repo(name=repo, owner=user), number=int(ref))
+        return NumberedResource(repo=Repo(name=repo, owner=user), number=int(ref))
     elif ref_type == "@":
         return ReleaseTag(repo=Repo(name=repo, owner=user), tag=ref)
     return None
