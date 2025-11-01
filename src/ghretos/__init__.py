@@ -1,5 +1,8 @@
 import collections
 import dataclasses
+import functools
+import string
+from typing import TYPE_CHECKING
 
 import yarl
 
@@ -25,17 +28,27 @@ __all__ = (
     "parse_shorthand",
 )
 
+if TYPE_CHECKING:
+    dataclass_deco = dataclasses.dataclass
+else:
+    dataclass_deco = functools.partial(
+        dataclasses.dataclass,
+        order=True,
+        kw_only=True,
+        frozen=True,
+    )
+
 
 class GitHubResource:
     pass
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class User(GitHubResource):
     login: str
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class Repo(GitHubResource):
     name: str
 
@@ -52,23 +65,23 @@ class Repo(GitHubResource):
 
 
 ## ISSUES
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class _Issue(GitHubResource):
     repo: Repo
     number: int
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class Issue(_Issue):
     pass
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class IssueComment(_Issue):
     comment_id: int
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class IssueEvent(_Issue):
     event_id: int
 
@@ -76,33 +89,33 @@ class IssueEvent(_Issue):
 ## PULL REQUESTS
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class _PullRequest(GitHubResource):
     repo: Repo
     number: int
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class PullRequest(_PullRequest):
     pass
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class PullRequestComment(_PullRequest):
     comment_id: int
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class PullRequestReview(_PullRequest):
     review_id: int
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class PullRequestReviewComment(_PullRequest):
     comment_id: int
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class PullRequestEvent(_PullRequest):
     event_id: int
 
@@ -110,19 +123,19 @@ class PullRequestEvent(_PullRequest):
 ### DISCUSSIONS
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class _Discussion(GitHubResource):
     repo: Repo
     number: int
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class Discussion(_Discussion):
     repo: Repo
     number: int
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class DiscussionComment(_Discussion):
     comment_id: int
 
@@ -130,23 +143,23 @@ class DiscussionComment(_Discussion):
 ## COMMITS
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class _Commit(GitHubResource):
     repo: Repo
     sha: str
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class Commit(_Commit):
     pass
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class CommitComment(_Commit):
     comment_id: int
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclass_deco
 class ReleaseTag(GitHubResource):
     repo: Repo
     tag: str
