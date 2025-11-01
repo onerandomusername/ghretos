@@ -244,6 +244,7 @@ def parse_url(
     # compare/diff between two refs
     # blame
 
+    # Case normalisation is not performed on GitHub's end, so we do not do it here either.
     resource_type = parts.popleft()
     if resource_type not in (
         "issues",
