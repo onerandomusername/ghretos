@@ -362,10 +362,17 @@ def parse_shorthand(
     else:
         user = default_user
 
+    # validate the user
+    for char in user:
+        if char not in string.ascii_letters + string.digits + "-._":
+            return None
+
     for char in shorthand:
         if char in ("#", "@"):
             ref_type = char
             break
+        if char not in string.ascii_letters + string.digits + "-._":
+            return None
         repo += char
     else:
         return Repo(name=repo, owner=user)
