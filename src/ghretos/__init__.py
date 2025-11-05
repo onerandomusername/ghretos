@@ -2,7 +2,7 @@ import collections
 import dataclasses
 import functools
 import string
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Literal
 
 import yarl
 
@@ -208,6 +208,11 @@ class MatcherSettings:
     short_numberables: bool = True
     short_refs: bool = True
 
+    require_strict_type: bool = True
+    """Whether to support /issues/, /pulls/, and /discussions/ only for their respective types.
+    If this is False, issues, pulls, and discussions will be ignored if the fragment indicates a type only supported by another resource.
+    """
+
     @classmethod
     def none(cls) -> "Self":
         return cls(
@@ -230,8 +235,12 @@ class MatcherSettings:
             short_refs=False,
         )
 
-    def _supported_resource_types(self) -> set[str]:
-        types: set[str] = set()
+    def _supported_resource_types(
+        self,
+    ) -> set[Literal["issues", "pull", "discussions", "commit", "releases"]]:
+        types: set[Literal["issues", "pull", "discussions", "commit", "releases"]] = (
+            set()
+        )
         if self.issues:
             types.add("issues")
         if self.pull_requests:
@@ -252,6 +261,158 @@ def _get_id_from_fragment(url: yarl.URL, prefix: str) -> str | None:
     fragment = url.fragment
     if fragment.startswith(prefix):
         return fragment[len(prefix) :]
+    return None
+
+
+def _parse_numberable_url(
+    *,
+    parsed_url: yarl.URL,
+    parts: collections.deque[str],
+    repo: Repo,
+    settings: MatcherSettings,
+    resource_type: Literal["issues", "pull", "discussions"],
+) -> GitHubResource | None:
+    """Parses a numbered resource URL into its corresponding resource.
+
+    This is used for shorthand parsing for numbered resources, where the specific type is not known.
+    """
+    path_number = parts.popleft()
+    if not path_number.isdigit():
+        return None
+    number = int(path_number)
+    if parts:
+        # parts doesn't properly redirect to other resource types, but the fragment may indicate a different type
+        # Importantly, additional parts are only supported on pull requests, and GitHub frontend does not redirect additional parts
+        next_part = parts.popleft()
+        if next_part not in ("commits", "files"):
+            return None
+        if resource_type != "pull" and settings.require_strict_type:
+            return None
+        resource_type = "pull"
+        # The only thing that works on these pages is pull request review comments
+        settings = dataclasses.replace(
+            settings,
+            require_strict_type=True,
+        )
+    else:
+        next_part = None
+
+    if not parsed_url.fragment:
+        match resource_type:
+            case "issues":
+                return Issue(repo=repo, number=number) if settings.issues else None
+            case "pull":
+                return (
+                    PullRequest(repo=repo, number=number)
+                    if settings.pull_requests
+                    else None
+                )
+            case "discussions":
+                return (
+                    Discussion(repo=repo, number=number)
+                    if settings.discussions
+                    else None
+                )
+
+    if next_part in ("commits", "files"):
+        if not settings.pull_request_review_comments:
+            return None
+        comment_id = _get_id_from_fragment(parsed_url, "r")
+        sha: str | None = None
+        commit_page = False
+        files_page = False
+        if not comment_id or not comment_id.isdigit():
+            return None
+
+        if next_part == "commits":
+            # pull/<num>/commits/<sha>#r<ID>
+            if not parts:
+                return None
+            sha = parts.popleft()
+            for char in sha:
+                if char not in string.hexdigits:
+                    return None
+            if parts:
+                return None
+            commit_page = True
+        elif next_part == "files":
+            if parts:
+                return None
+            files_page = True
+        else:
+            raise NotImplementedError("Unreachable code reached in parse_url")
+
+        return PullRequestReviewComment(
+            repo=repo,
+            number=number,
+            comment_id=int(comment_id),
+            sha=sha,
+            commit_page=commit_page,
+            files_page=files_page,
+        )
+
+    # Checking settings is lazy as it would be bad to match a comment link to an issue when issue comments are disabled
+    if (
+        comment_id := _get_id_from_fragment(parsed_url, "issuecomment-")
+    ) and comment_id.isdigit():
+        if settings.require_strict_type:
+            if resource_type == "issues" and settings.issue_comments:
+                comment_type = IssueComment
+            elif resource_type == "pull" and settings.pull_request_comments:
+                comment_type = PullRequestComment
+            else:
+                return None
+        else:
+            comment_type = IssueComment
+        return comment_type(repo=repo, number=number, comment_id=int(comment_id))
+    if (
+        event_id := _get_id_from_fragment(parsed_url, "event-")
+    ) is not None and event_id.isdigit():
+        if settings.require_strict_type:
+            if resource_type == "issues" and settings.issue_events:
+                event_type = IssueEvent
+            elif resource_type == "pull" and settings.pull_request_events:
+                event_type = PullRequestEvent
+            else:
+                return None
+        else:
+            event_type = IssueEvent
+        return event_type(repo=repo, number=number, event_id=int(event_id))
+
+    if (
+        review_id := _get_id_from_fragment(parsed_url, "pullrequestreview-")
+    ) and review_id.isdigit():
+        if resource_type != "pull" and settings.require_strict_type:
+            return None
+        return (
+            PullRequestReview(repo=repo, number=number, review_id=int(review_id))
+            if settings.pull_request_reviews
+            else None
+        )
+    if (
+        review_comment_id := _get_id_from_fragment(parsed_url, "discussion_r")
+    ) and review_comment_id.isdigit():
+        if resource_type != "pull" and settings.require_strict_type:
+            return None
+        return (
+            PullRequestReviewComment(
+                repo=repo, number=number, comment_id=int(review_comment_id)
+            )
+            if settings.pull_request_review_comments
+            else None
+        )
+    if (
+        discussion_comment_id := _get_id_from_fragment(parsed_url, "discussioncomment-")
+    ) and discussion_comment_id.isdigit():
+        if resource_type != "discussions" and settings.require_strict_type:
+            return None
+        return (
+            DiscussionComment(
+                repo=repo, number=number, comment_id=int(discussion_comment_id)
+            )
+            if settings.discussion_comments
+            else None
+        )
     return None
 
 
@@ -335,7 +496,7 @@ def parse_url(
     # Case normalisation is not performed on GitHub's end, so we do not do it here either.
     resource_type = parts.popleft()
     # Set supported resource types based on settings
-    if resource_type not in settings._supported_resource_types():
+    if resource_type not in settings._supported_resource_types():  # pyright: ignore[reportPrivateUsage]
         return None
     if resource_type == "releases":
         # only tag subresource is supported
@@ -346,148 +507,25 @@ def parse_url(
         tag = parts.popleft()
         return ReleaseTag(repo=repo, tag=tag)
 
-    match resource_type:
-        case "issues":
-            issue_number = parts.popleft()
-            if not issue_number.isdigit():
-                return None
-            issue_number = int(issue_number)
-            if (
-                comment_id := _get_id_from_fragment(parsed_url, "issuecomment-")
-            ) and comment_id.isdigit():
-                return (
-                    IssueComment(
-                        repo=repo, number=issue_number, comment_id=int(comment_id)
-                    )
-                    if settings.issue_comments
-                    else None
-                )
-            event_id = _get_id_from_fragment(parsed_url, "event-")
-            if event_id is not None and event_id.isdigit():
-                return (
-                    IssueEvent(repo=repo, number=issue_number, event_id=int(event_id))
-                    if settings.issue_events
-                    else None
-                )
-            return Issue(repo=repo, number=issue_number) if settings.issues else None
-        case "pull":
-            pull_number = parts.popleft()
-            # validate that parts is empty:
-            if parts:
-                next_part = parts.popleft()
-                if next_part not in ("commits", "files"):
-                    return None
-                if next_part == "commits":
-                    # pull/<num>/commits/<sha>#r<ID>
-                    if not parts:
-                        return None
-                    sha = parts.popleft()
-                    if parts:
-                        return None
-                    comment_id = _get_id_from_fragment(parsed_url, "r")
-                    if comment_id is not None and comment_id.isdigit():
-                        return (
-                            PullRequestReviewComment(
-                                repo=repo,
-                                number=int(pull_number),
-                                comment_id=int(comment_id),
-                                sha=sha,
-                                commit_page=True,
-                            )
-                            if settings.pull_request_review_comments
-                            else None
-                        )
-                    return None  # no other resource supported on this page
-                elif next_part == "files":
-                    # pull/files#r<ID>
-                    if parts:
-                        return None
-                    comment_id = _get_id_from_fragment(parsed_url, "r")
-                    if comment_id is not None and comment_id.isdigit():
-                        return (
-                            PullRequestReviewComment(
-                                repo=repo,
-                                number=int(pull_number),
-                                comment_id=int(comment_id),
-                                files_page=True,
-                            )
-                            if settings.pull_request_review_comments
-                            else None
-                        )
-                    return None  # no other resource supported on this page
+    if resource_type in ("issues", "pull", "discussions"):
+        return _parse_numberable_url(
+            parsed_url=parsed_url,
+            parts=parts,
+            repo=repo,
+            settings=settings,
+            resource_type=resource_type,
+        )
 
-            if not pull_number.isdigit():
-                return None
-            pull_number = int(pull_number)
-            if (
-                comment_id := _get_id_from_fragment(parsed_url, "issuecomment-")
-            ) and comment_id.isdigit():
-                return (
-                    PullRequestComment(
-                        repo=repo, number=pull_number, comment_id=int(comment_id)
-                    )
-                    if settings.pull_request_comments
-                    else None
-                )
-            if (
-                review_id := _get_id_from_fragment(parsed_url, "pullrequestreview-")
-            ) and review_id.isdigit():
-                return (
-                    PullRequestReview(
-                        repo=repo, number=pull_number, review_id=int(review_id)
-                    )
-                    if settings.pull_request_reviews
-                    else None
-                )
-            if (
-                review_comment_id := _get_id_from_fragment(parsed_url, "discussion_r")
-            ) and review_comment_id.isdigit():
-                return (
-                    PullRequestReviewComment(
-                        repo=repo, number=pull_number, comment_id=int(review_comment_id)
-                    )
-                    if settings.pull_request_review_comments
-                    else None
-                )
-            event_id = _get_id_from_fragment(parsed_url, "event-")
-            if event_id is not None and event_id.isdigit():
-                return (
-                    PullRequestEvent(
-                        repo=repo, number=pull_number, event_id=int(event_id)
-                    )
-                    if settings.pull_request_events
-                    else None
-                )
-            return PullRequest(repo=repo, number=pull_number)
-        case "discussions":
-            discussion_number = parts.popleft()
-            if not discussion_number.isdigit():
-                return None
-            discussion_number = int(discussion_number)
-            comment_id = _get_id_from_fragment(parsed_url, "discussioncomment-")
-            if comment_id is not None and comment_id.isdigit():
-                return (
-                    DiscussionComment(
-                        repo=repo, number=discussion_number, comment_id=int(comment_id)
-                    )
-                    if settings.discussion_comments
-                    else None
-                )
+    if resource_type == "commit":
+        sha = parts.popleft()
+        comment_id = _get_id_from_fragment(parsed_url, "commitcomment-")
+        if comment_id is not None and comment_id.isdigit():
             return (
-                Discussion(repo=repo, number=discussion_number)
-                if settings.discussions
+                CommitComment(repo=repo, sha=sha, comment_id=int(comment_id))
+                if settings.commit_comments
                 else None
             )
-        case "commit":
-            sha = parts.popleft()
-            comment_id = _get_id_from_fragment(parsed_url, "commitcomment-")
-            if comment_id is not None and comment_id.isdigit():
-                return (
-                    CommitComment(repo=repo, sha=sha, comment_id=int(comment_id))
-                    if settings.commit_comments
-                    else None
-                )
-            return Commit(repo=repo, sha=sha) if settings.commits else None
+        return Commit(repo=repo, sha=sha) if settings.commits else None
 
 
 def parse_shorthand(
