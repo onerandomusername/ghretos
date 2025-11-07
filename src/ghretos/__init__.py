@@ -297,28 +297,22 @@ def _parse_numberable_url(
     else:
         next_part = None
 
-    match resource_type:
-        case "issues" | "pull":
-            if not parsed_url.fragment or _get_id_from_fragment(
-                parsed_url, "issue-"
-            ):
-                if resource_type == "issues":
-                    return Issue(repo=repo, number=number) if settings.issues else None
-                else:
-                    return (
-                    PullRequest(repo=repo, number=number)
-                    if settings.pull_requests
-                    else None
-                )
-        case "discussions":
-            if not parsed_url.fragment or _get_id_from_fragment(
-                parsed_url, "discussion-"
-            ):
-                return (
-                    Discussion(repo=repo, number=number)
-                    if settings.discussions
-                    else None
-                )
+    if not parsed_url.fragment or _get_id_from_fragment(parsed_url, "issue-"):
+        if resource_type == "issues":
+            return Issue(repo=repo, number=number) if settings.issues else None
+        elif resource_type == "pull":
+            return (
+                PullRequest(repo=repo, number=number)
+                if settings.pull_requests
+                else None
+            )
+        elif settings.require_strict_type:
+            return None
+        return Issue(repo=repo, number=number) if settings.issues else None
+    if not parsed_url.fragment or _get_id_from_fragment(parsed_url, "discussion-"):
+        if resource_type != "discussions" and settings.require_strict_type:
+            return None
+        return Discussion(repo=repo, number=number) if settings.discussions else None
 
     if next_part in ("commits", "files"):
         if not settings.pull_request_review_comments:
