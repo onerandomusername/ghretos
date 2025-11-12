@@ -1,5 +1,3 @@
-import collections
-
 import pytest
 import yarl
 
@@ -68,7 +66,7 @@ def test_parse_github_url_various(
         assert isinstance(resource, expected_type)
 
 
-# Test cases for _parse_numberable_url
+# Test cases for _parse_strict_url and _parse_unstrict_url
 @pytest.fixture
 def default_settings():
     """Fixture providing default settings with all features enabled."""
@@ -76,7 +74,7 @@ def default_settings():
 
 
 class TestParseNumberableUrl:
-    """Test suite for the _parse_numberable_url function."""
+    """Test suite for the _parse_strict_url and _parse_unstrict_url functions."""
 
     # --- Basic Issues ---
     @pytest.mark.parametrize(
@@ -101,23 +99,11 @@ class TestParseNumberableUrl:
         """Test parsing basic issue URLs with various owner/repo/number combinations."""
         url = f"https://github.com/{owner}/{repo_name}/issues/{number}"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()  # remove leading /
-        parts.popleft()  # remove owner
-        parts.popleft()  # remove repo
-        parts.popleft()  # remove "issues"
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="issues",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.Issue)
-        assert result.repo == repo
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
 
     @pytest.mark.parametrize(
@@ -139,20 +125,8 @@ class TestParseNumberableUrl:
         """Test parsing issue URLs with #issue-XXX fragments."""
         url = f"https://github.com/{owner}/{repo_name}/issues/{number}#{fragment}"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="issues",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.Issue)
         assert result.number == number
@@ -177,23 +151,11 @@ class TestParseNumberableUrl:
         """Test parsing basic pull request URLs."""
         url = f"https://github.com/{owner}/{repo_name}/pull/{number}"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequest)
-        assert result.repo == repo
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
 
     # --- Basic Discussions ---
@@ -212,23 +174,11 @@ class TestParseNumberableUrl:
         # With require_strict_type=False, discussions without fragments are supported
         url = f"https://github.com/{owner}/{repo_name}/discussions/{number}"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="discussions",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.Discussion)
-        assert result.repo == repo
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
 
     @pytest.mark.parametrize(
@@ -249,20 +199,8 @@ class TestParseNumberableUrl:
         """Test parsing discussion URLs with #discussion-XXX fragments."""
         url = f"https://github.com/{owner}/{repo_name}/discussions/{number}#{fragment}"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="discussions",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.Discussion)
         assert result.number == number
@@ -288,23 +226,11 @@ class TestParseNumberableUrl:
         """Test parsing issue comment URLs with #issuecomment-XXX."""
         url = f"https://github.com/{owner}/{repo_name}/issues/{number}#issuecomment-{comment_id}"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="issues",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.IssueComment)
-        assert result.repo == repo
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
         assert result.comment_id == comment_id
 
@@ -328,23 +254,11 @@ class TestParseNumberableUrl:
         """Test parsing pull request comment URLs with #issuecomment-XXX."""
         url = f"https://github.com/{owner}/{repo_name}/pull/{number}#issuecomment-{comment_id}"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequestComment)
-        assert result.repo == repo
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
         assert result.comment_id == comment_id
 
@@ -368,23 +282,11 @@ class TestParseNumberableUrl:
         """Test parsing issue event URLs with #event-XXX."""
         url = f"https://github.com/{owner}/{repo_name}/issues/{number}#event-{event_id}"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="issues",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.IssueEvent)
-        assert result.repo == repo
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
         assert result.event_id == event_id
 
@@ -408,23 +310,11 @@ class TestParseNumberableUrl:
         """Test parsing pull request event URLs with #event-XXX."""
         url = f"https://github.com/{owner}/{repo_name}/pull/{number}#event-{event_id}"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequestEvent)
-        assert result.repo == repo
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
         assert result.event_id == event_id
 
@@ -448,23 +338,11 @@ class TestParseNumberableUrl:
         """Test parsing pull request review URLs with #pullrequestreview-XXX."""
         url = f"https://github.com/{owner}/{repo_name}/pull/{number}#pullrequestreview-{review_id}"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequestReview)
-        assert result.repo == repo
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
         assert result.review_id == review_id
 
@@ -488,23 +366,11 @@ class TestParseNumberableUrl:
         """Test parsing pull request review comment URLs with #discussion_rXXX."""
         url = f"https://github.com/{owner}/{repo_name}/pull/{number}#discussion_r{comment_id}"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequestReviewComment)
-        assert result.repo == repo
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
         assert result.comment_id == comment_id
         assert result.sha is None
@@ -533,23 +399,11 @@ class TestParseNumberableUrl:
         """Test parsing pull request review comments on commits page."""
         url = f"https://github.com/{owner}/{repo_name}/pull/{number}/commits/{sha}#r{comment_id}"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequestReviewComment)
-        assert result.repo == repo
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
         assert result.comment_id == comment_id
         assert result.sha == sha
@@ -578,23 +432,11 @@ class TestParseNumberableUrl:
             f"https://github.com/{owner}/{repo_name}/pull/{number}/files#r{comment_id}"
         )
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequestReviewComment)
-        assert result.repo == repo
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
         assert result.comment_id == comment_id
         assert result.sha is None
@@ -621,23 +463,11 @@ class TestParseNumberableUrl:
         """Test parsing discussion comment URLs with #discussioncomment-XXX."""
         url = f"https://github.com/{owner}/{repo_name}/discussions/{number}#discussioncomment-{comment_id}"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name=repo_name, owner=owner)
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="discussions",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.DiscussionComment)
-        assert result.repo == repo
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
         assert result.comment_id == comment_id
 
@@ -648,20 +478,8 @@ class TestParseNumberableUrl:
         """Test that non-numeric issue numbers return None."""
         url = "https://github.com/owner/repo/issues/abc"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="issues",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -671,20 +489,8 @@ class TestParseNumberableUrl:
         """Test that non-numeric comment IDs return None."""
         url = "https://github.com/owner/repo/issues/123#issuecomment-abc"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="issues",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -694,20 +500,8 @@ class TestParseNumberableUrl:
         """Test that non-hexadecimal SHAs in commits page return None."""
         url = "https://github.com/owner/repo/pull/123/commits/xyz123#r456"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -717,20 +511,8 @@ class TestParseNumberableUrl:
         """Test that extra parts after /files return None."""
         url = "https://github.com/owner/repo/pull/123/files/extra#r456"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -740,20 +522,8 @@ class TestParseNumberableUrl:
         """Test that /commits without a SHA returns None."""
         url = "https://github.com/owner/repo/pull/123/commits#r456"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -761,20 +531,8 @@ class TestParseNumberableUrl:
         """Test that invalid subpaths return None."""
         url = "https://github.com/owner/repo/issues/123/invalid"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="issues",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -785,20 +543,8 @@ class TestParseNumberableUrl:
         """Test that discussion fragment on /issues/ returns None with strict type."""
         url = "https://github.com/owner/repo/issues/123#discussioncomment-456"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="issues",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -808,20 +554,8 @@ class TestParseNumberableUrl:
         """Test that pull request review fragment on /issues/ returns None with strict type."""
         url = "https://github.com/owner/repo/issues/123#pullrequestreview-456"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="issues",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -831,20 +565,8 @@ class TestParseNumberableUrl:
         """Test that discussion fragment on /pull/ returns None with strict type."""
         url = "https://github.com/owner/repo/pull/123#discussioncomment-456"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=default_settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -854,20 +576,8 @@ class TestParseNumberableUrl:
         settings = ghretos.MatcherSettings(require_strict_type=False)
         url = "https://github.com/owner/repo/issues/123/commits/abc123#r456"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=settings,
-            resource_type="issues",
-        )
+        result = ghretos._parse_unstrict_url(parsed_url, settings=settings)
 
         assert isinstance(result, ghretos.PullRequestReviewComment)
 
@@ -877,20 +587,8 @@ class TestParseNumberableUrl:
         settings = ghretos.MatcherSettings(require_strict_type=False)
         url = "https://github.com/owner/repo/issues/123/files#r456"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=settings,
-            resource_type="issues",
-        )
+        result = ghretos._parse_unstrict_url(parsed_url, settings=settings)
 
         assert isinstance(result, ghretos.PullRequestReviewComment)
 
@@ -900,20 +598,8 @@ class TestParseNumberableUrl:
         settings = ghretos.MatcherSettings(issues=False)
         url = "https://github.com/owner/repo/issues/123"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=settings,
-            resource_type="issues",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
 
@@ -922,20 +608,8 @@ class TestParseNumberableUrl:
         settings = ghretos.MatcherSettings(pull_requests=False)
         url = "https://github.com/owner/repo/pull/123"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
 
@@ -944,20 +618,8 @@ class TestParseNumberableUrl:
         settings = ghretos.MatcherSettings(discussions=False)
         url = "https://github.com/owner/repo/discussions/123"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=settings,
-            resource_type="discussions",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
 
@@ -966,20 +628,8 @@ class TestParseNumberableUrl:
         settings = ghretos.MatcherSettings(issue_comments=False)
         url = "https://github.com/owner/repo/issues/123#issuecomment-456"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=settings,
-            resource_type="issues",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
 
@@ -988,20 +638,8 @@ class TestParseNumberableUrl:
         settings = ghretos.MatcherSettings(pull_request_reviews=False)
         url = "https://github.com/owner/repo/pull/123#pullrequestreview-456"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
 
@@ -1010,20 +648,8 @@ class TestParseNumberableUrl:
         settings = ghretos.MatcherSettings(pull_request_review_comments=False)
         url = "https://github.com/owner/repo/pull/123#discussion_r456"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=settings,
-            resource_type="pull",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
 
@@ -1032,19 +658,7 @@ class TestParseNumberableUrl:
         settings = ghretos.MatcherSettings(discussion_comments=False)
         url = "https://github.com/owner/repo/discussions/123#discussioncomment-456"
         parsed_url = yarl.URL(url)
-        parts = collections.deque(parsed_url.parts)
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
-        parts.popleft()
 
-        repo = ghretos.Repo(name="repo", owner="owner")
-        result = ghretos._parse_numberable_url(
-            parsed_url=parsed_url,
-            parts=parts,
-            repo=repo,
-            settings=settings,
-            resource_type="discussions",
-        )
+        result = ghretos._parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
