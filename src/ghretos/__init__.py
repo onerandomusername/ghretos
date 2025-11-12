@@ -297,22 +297,46 @@ def _parse_numberable_url(
     else:
         next_part = None
 
-    if not parsed_url.fragment or _get_id_from_fragment(parsed_url, "issue-"):
-        if resource_type == "issues":
-            return Issue(repo=repo, number=number) if settings.issues else None
+    fragment = None
+    if not parsed_url.fragment or parsed_url.fragment.startswith(
+        ("issue-", "discussion-")
+    ):
+        if fragment:
+            if fragment.startswith("issue-"):
+                # must be a pull or issue
+                if resource_type == "issues":
+                    return Issue(repo=repo, number=number) if settings.issues else None
+                elif resource_type == "pull":
+                    return (
+                        PullRequest(repo=repo, number=number)
+                        if settings.pull_requests
+                        else None
+                    )
+            if fragment.startswith("discussion-"):
+                if resource_type != "discussions" and settings.require_strict_type:
+                    return None
+                return (
+                    Discussion(repo=repo, number=number)
+                    if settings.discussions
+                    else None
+                )
         elif resource_type == "pull":
             return (
                 PullRequest(repo=repo, number=number)
                 if settings.pull_requests
                 else None
             )
+        elif resource_type == "issues":
+            return Issue(repo=repo, number=number) if settings.issues else None
+        elif resource_type == "discussions":
+            return (
+                Discussion(repo=repo, number=number)
+                if settings.discussions
+                else None
+            )
         elif settings.require_strict_type:
             return None
         return Issue(repo=repo, number=number) if settings.issues else None
-    if not parsed_url.fragment or _get_id_from_fragment(parsed_url, "discussion-"):
-        if resource_type != "discussions" and settings.require_strict_type:
-            return None
-        return Discussion(repo=repo, number=number) if settings.discussions else None
 
     if next_part in ("commits", "files"):
         if not settings.pull_request_review_comments:
