@@ -2,6 +2,10 @@ import pytest
 import yarl
 
 import ghretos
+from ghretos.parsing import (
+    _parse_strict_url as parse_strict_url,  # pyright: ignore[reportPrivateUsage]
+    _parse_unstrict_url as parse_unstrict_url,  # pyright: ignore[reportPrivateUsage]
+)
 
 
 @pytest.mark.parametrize(
@@ -100,7 +104,7 @@ class TestParseNumberableUrl:
         url = f"https://github.com/{owner}/{repo_name}/issues/{number}"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.Issue)
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
@@ -126,7 +130,7 @@ class TestParseNumberableUrl:
         url = f"https://github.com/{owner}/{repo_name}/issues/{number}#{fragment}"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.Issue)
         assert result.number == number
@@ -152,7 +156,7 @@ class TestParseNumberableUrl:
         url = f"https://github.com/{owner}/{repo_name}/pull/{number}"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequest)
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
@@ -175,7 +179,7 @@ class TestParseNumberableUrl:
         url = f"https://github.com/{owner}/{repo_name}/discussions/{number}"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.Discussion)
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
@@ -200,7 +204,7 @@ class TestParseNumberableUrl:
         url = f"https://github.com/{owner}/{repo_name}/discussions/{number}#{fragment}"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.Discussion)
         assert result.number == number
@@ -227,7 +231,7 @@ class TestParseNumberableUrl:
         url = f"https://github.com/{owner}/{repo_name}/issues/{number}#issuecomment-{comment_id}"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.IssueComment)
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
@@ -255,7 +259,7 @@ class TestParseNumberableUrl:
         url = f"https://github.com/{owner}/{repo_name}/pull/{number}#issuecomment-{comment_id}"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequestComment)
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
@@ -283,7 +287,7 @@ class TestParseNumberableUrl:
         url = f"https://github.com/{owner}/{repo_name}/issues/{number}#event-{event_id}"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.IssueEvent)
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
@@ -311,7 +315,7 @@ class TestParseNumberableUrl:
         url = f"https://github.com/{owner}/{repo_name}/pull/{number}#event-{event_id}"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequestEvent)
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
@@ -339,7 +343,7 @@ class TestParseNumberableUrl:
         url = f"https://github.com/{owner}/{repo_name}/pull/{number}#pullrequestreview-{review_id}"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequestReview)
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
@@ -367,7 +371,7 @@ class TestParseNumberableUrl:
         url = f"https://github.com/{owner}/{repo_name}/pull/{number}#discussion_r{comment_id}"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequestReviewComment)
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
@@ -400,7 +404,7 @@ class TestParseNumberableUrl:
         url = f"https://github.com/{owner}/{repo_name}/pull/{number}/commits/{sha}#r{comment_id}"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequestReviewComment)
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
@@ -433,7 +437,7 @@ class TestParseNumberableUrl:
         )
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.PullRequestReviewComment)
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
@@ -464,7 +468,7 @@ class TestParseNumberableUrl:
         url = f"https://github.com/{owner}/{repo_name}/discussions/{number}#discussioncomment-{comment_id}"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert isinstance(result, ghretos.DiscussionComment)
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
@@ -479,7 +483,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/issues/abc"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -490,7 +494,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/issues/123#issuecomment-abc"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -501,7 +505,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/pull/123/commits/xyz123#r456"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -512,7 +516,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/pull/123/files/extra#r456"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -523,7 +527,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/pull/123/commits#r456"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -532,7 +536,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/issues/123/invalid"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -544,7 +548,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/issues/123#discussioncomment-456"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -555,7 +559,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/issues/123#pullrequestreview-456"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -566,7 +570,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/pull/123#discussioncomment-456"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=default_settings)
+        result = parse_strict_url(parsed_url, settings=default_settings)
 
         assert result is None
 
@@ -577,7 +581,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/issues/123/commits/abc123#r456"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_unstrict_url(parsed_url, settings=settings)
+        result = parse_unstrict_url(parsed_url, settings=settings)
 
         assert isinstance(result, ghretos.PullRequestReviewComment)
 
@@ -588,7 +592,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/issues/123/files#r456"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_unstrict_url(parsed_url, settings=settings)
+        result = parse_unstrict_url(parsed_url, settings=settings)
 
         assert isinstance(result, ghretos.PullRequestReviewComment)
 
@@ -599,7 +603,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/issues/123"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=settings)
+        result = parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
 
@@ -609,7 +613,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/pull/123"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=settings)
+        result = parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
 
@@ -619,7 +623,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/discussions/123"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=settings)
+        result = parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
 
@@ -629,7 +633,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/issues/123#issuecomment-456"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=settings)
+        result = parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
 
@@ -639,7 +643,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/pull/123#pullrequestreview-456"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=settings)
+        result = parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
 
@@ -649,7 +653,7 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/pull/123#discussion_r456"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=settings)
+        result = parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
 
@@ -659,6 +663,6 @@ class TestParseNumberableUrl:
         url = "https://github.com/owner/repo/discussions/123#discussioncomment-456"
         parsed_url = yarl.URL(url)
 
-        result = ghretos._parse_strict_url(parsed_url, settings=settings)
+        result = parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
