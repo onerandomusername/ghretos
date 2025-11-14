@@ -172,7 +172,11 @@ class TestParseNumberableUrl:
         ],
     )
     def test_basic_discussion(
-        self, owner, repo_name, number, default_settings: ghretos.MatcherSettings
+        self,
+        owner: str,
+        repo_name: str,
+        number: int,
+        default_settings: ghretos.MatcherSettings,
     ):
         """Test parsing basic discussion URLs without strict type checking."""
         # With require_strict_type=False, discussions without fragments are supported
@@ -945,3 +949,55 @@ class TestParseUnstrictUrl:
         for url in unsupported_urls:
             result = parse_unstrict_url(yarl.URL(url), settings=unstrict_settings)
             assert result is None, f"Expected None for {url}"
+
+    # --- Issue and Discussion Comments ---
+    @pytest.mark.parametrize(
+        ("url", "expected_type", "expected_comment_id"),
+        [
+            (
+                "https://github.com/owner/repo/issues/123#issuecomment-789",
+                ghretos.IssueComment,
+                789,
+            ),
+            (
+                "https://github.com/owner/repo/pull/123#issuecomment-456",
+                ghretos.PullRequestComment,
+                456,
+            ),
+            (
+                "https://github.com/owner/repo/discussions/123#discussioncomment-555",
+                ghretos.DiscussionComment,
+                555,
+            ),
+            (
+                "https://github.com/owner/repo/pull/123#discussioncomment-789",
+                ghretos.DiscussionComment,
+                789,
+            ),
+            (
+                "https://github.com/owner/repo/pull/123#discussioncomment-456",
+                ghretos.DiscussionComment,
+                456,
+            ),
+            (
+                "https://github.com/owner/repo/discussions/123#issuecomment-555",
+                ghretos.IssueComment,
+                555,
+            ),
+        ],
+    )
+    def test_issue_and_discussion_comments(
+        self,
+        url: str,
+        expected_type: type[ghretos.IssueComment]
+        | type[ghretos.PullRequestComment]
+        | type[ghretos.DiscussionComment],
+        expected_comment_id: int,
+        unstrict_settings: ghretos.MatcherSettings,
+    ) -> None:
+        """Test parsing issue, pull request, and discussion comments in unstrict mode."""
+        parsed_url = yarl.URL(url)
+        result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
+        assert result is not None
+        assert isinstance(result, expected_type)
+        assert result.comment_id == expected_comment_id

@@ -277,6 +277,56 @@ def _parse_unstrict_url(parsed_url: yarl.URL, *, settings: models.MatcherSetting
             "issues" | "pull" | "discussions" as resource_type,
             resource_id,
             fragment,
+        ] if fragment.startswith("#issuecomment-"):
+            if not resource_id.isdigit():
+                return None
+            comment_id = fragment[len("#issuecomment-") :]
+            if not comment_id.isdigit():
+                return None
+            if resource_type == "pull":
+                return (
+                    models.PullRequestComment(
+                        repo=models.Repo(name=repo, owner=owner),
+                        number=int(resource_id),
+                        comment_id=int(comment_id),
+                    )
+                    if settings.pull_request_comments
+                    else None
+                )
+            return (
+                models.IssueComment(
+                    repo=models.Repo(name=repo, owner=owner),
+                    number=int(resource_id),
+                    comment_id=int(comment_id),
+                )
+                if settings.issue_comments
+                else None
+            )
+        case [
+            owner,
+            repo,
+            "issues" | "pull" | "discussions" as resource_type,
+            resource_id,
+            fragment,
+        ] if settings.discussion_comments and fragment.startswith(
+            "#discussioncomment-"
+        ):
+            if not resource_id.isdigit():
+                return None
+            comment_id = fragment[len("#discussioncomment-") :]
+            if not comment_id.isdigit():
+                return None
+            return models.DiscussionComment(
+                repo=models.Repo(name=repo, owner=owner),
+                number=int(resource_id),
+                comment_id=int(comment_id),
+            )
+        case [
+            owner,
+            repo,
+            "issues" | "pull" | "discussions" as resource_type,
+            resource_id,
+            fragment,
         ] if fragment.startswith(("#issue-", "#discussion-")):
             if not resource_id.isdigit():
                 return None
