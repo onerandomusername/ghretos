@@ -666,3 +666,282 @@ class TestParseNumberableUrl:
         result = parse_strict_url(parsed_url, settings=settings)
 
         assert result is None
+
+
+class TestParseUnstrictUrl:
+    """Test suite for the _parse_unstrict_url function with require_strict_type=False."""
+
+    @pytest.fixture
+    def unstrict_settings(self):
+        """Fixture providing settings with strict type checking disabled."""
+        return ghretos.MatcherSettings(require_strict_type=False)
+
+    # --- Basic Numberable Resources ---
+    @pytest.mark.parametrize(
+        ("url", "expected_type"),
+        [
+            ("https://github.com/owner/repo/issues/123", ghretos.Issue),
+            ("https://github.com/owner/repo/pull/456", ghretos.PullRequest),
+            ("https://github.com/owner/repo/discussions/789", ghretos.Discussion),
+        ],
+    )
+    def test_basic_numberable_resources(
+        self, url: str, expected_type: type, unstrict_settings: ghretos.MatcherSettings
+    ) -> None:
+        """Test parsing basic numberable resources without fragments."""
+        parsed_url = yarl.URL(url)
+        result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
+        assert isinstance(result, expected_type)
+
+    # --- User and Repo ---
+    @pytest.mark.parametrize(
+        ("url", "expected_type"),
+        [
+            ("https://github.com/owner", ghretos.User),
+            ("https://github.com/owner/repo", ghretos.Repo),
+        ],
+    )
+    def test_user_and_repo(
+        self, url: str, expected_type: type, unstrict_settings: ghretos.MatcherSettings
+    ) -> None:
+        """Test parsing user and repo URLs."""
+        parsed_url = yarl.URL(url)
+        result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
+        assert isinstance(result, expected_type)
+
+    # --- Issue and Discussion Fragments on Different Resource Types ---
+    @pytest.mark.parametrize(
+        ("url", "expected_type"),
+        [
+            # #issue- fragments
+            ("https://github.com/owner/repo/issues/123#issue-123", ghretos.Issue),
+            ("https://github.com/owner/repo/pull/456#issue-456", ghretos.PullRequest),
+            # #discussion- fragments
+            (
+                "https://github.com/owner/repo/discussions/789#discussion-789",
+                ghretos.Discussion,
+            ),
+            (
+                "https://github.com/owner/repo/issues/111#discussion-111",
+                ghretos.Discussion,
+            ),
+            (
+                "https://github.com/owner/repo/pull/222#discussion-222",
+                ghretos.Discussion,
+            ),
+        ],
+    )
+    def test_issue_and_discussion_fragments(
+        self, url: str, expected_type: type, unstrict_settings: ghretos.MatcherSettings
+    ) -> None:
+        """Test parsing URLs with #issue- and #discussion- fragments on various resource types."""
+        parsed_url = yarl.URL(url)
+        result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
+        assert isinstance(result, expected_type)
+
+    # --- Pull Request Reviews with Different Prefixes ---
+    @pytest.mark.parametrize(
+        ("url", "expected_type"),
+        [
+            (
+                "https://github.com/owner/repo/issues/123#pullrequestreview-456",
+                ghretos.PullRequestReview,
+            ),
+            (
+                "https://github.com/owner/repo/pull/123#pullrequestreview-456",
+                ghretos.PullRequestReview,
+            ),
+            (
+                "https://github.com/owner/repo/discussions/123#pullrequestreview-456",
+                ghretos.PullRequestReview,
+            ),
+            (
+                "https://github.com/owner/repo/issues/123#discussion_r456",
+                ghretos.PullRequestReviewComment,
+            ),
+            (
+                "https://github.com/owner/repo/pull/123#discussion_r456",
+                ghretos.PullRequestReviewComment,
+            ),
+            (
+                "https://github.com/owner/repo/discussions/123#discussion_r456",
+                ghretos.PullRequestReviewComment,
+            ),
+        ],
+    )
+    def test_pull_request_review_comment_fragments(
+        self,
+        url: str,
+        expected_type: type,
+        unstrict_settings: ghretos.MatcherSettings,
+    ) -> None:
+        """Test parsing PR review comments on various resource types."""
+        parsed_url = yarl.URL(url)
+        result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
+        assert isinstance(result, expected_type)
+
+    # --- Commits and Files Pages with /issues/ URLs ---
+    @pytest.mark.parametrize(
+        ("url", "expected_sha", "expected_commit_page", "expected_files_page"),
+        [
+            (
+                "https://github.com/owner/repo/issues/123/commits/abc123#r456",
+                "abc123",
+                True,
+                False,
+            ),
+            (
+                "https://github.com/owner/repo/pull/123/commits/def456#r789",
+                "def456",
+                True,
+                False,
+            ),
+            ("https://github.com/owner/repo/issues/123/files#r456", None, False, True),
+            ("https://github.com/owner/repo/pull/123/files#r789", None, False, True),
+        ],
+    )
+    def test_commits_and_files_pages(
+        self,
+        url: str,
+        expected_sha: str | None,
+        expected_commit_page: bool,
+        expected_files_page: bool,
+        unstrict_settings: ghretos.MatcherSettings,
+    ) -> None:
+        """Test parsing commits and files pages, including /issues/ URLs converted to PR type."""
+        parsed_url = yarl.URL(url)
+        result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
+
+        assert isinstance(result, ghretos.PullRequestReviewComment)
+        assert result.sha == expected_sha
+        assert result.commit_page == expected_commit_page
+        assert result.files_page == expected_files_page
+
+    # --- Invalid Inputs ---
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://github.com/owner/repo/issues/abc",  # Non-numeric number
+            "https://github.com/owner/repo/issues/123/commits/xyz#r456",  # Non-hex SHA
+            "https://github.com/owner/repo/issues/123#unknown-fragment",  # Unknown fragment
+        ],
+    )
+    def test_invalid_inputs(
+        self, url: str, unstrict_settings: ghretos.MatcherSettings
+    ) -> None:
+        """Test that invalid inputs return None."""
+        parsed_url = yarl.URL(url)
+        result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
+        assert result is None
+
+    # --- Settings Tests ---
+    def test_disabled_issues(self) -> None:
+        """Test that issues are not parsed when disabled."""
+        settings = ghretos.MatcherSettings(require_strict_type=False, issues=False)
+        url = "https://github.com/owner/repo/issues/123"
+        parsed_url = yarl.URL(url)
+
+        result = parse_unstrict_url(parsed_url, settings=settings)
+
+        assert result is None
+
+    def test_disabled_pull_requests(self) -> None:
+        """Test that pull requests are not parsed when disabled."""
+        settings = ghretos.MatcherSettings(
+            require_strict_type=False, pull_requests=False
+        )
+        url = "https://github.com/owner/repo/pull/123"
+        parsed_url = yarl.URL(url)
+
+        result = parse_unstrict_url(parsed_url, settings=settings)
+
+        assert result is None
+
+    def test_disabled_discussions(self) -> None:
+        """Test that discussions are not parsed when disabled."""
+        settings = ghretos.MatcherSettings(require_strict_type=False, discussions=False)
+        url = "https://github.com/owner/repo/discussions/123"
+        parsed_url = yarl.URL(url)
+
+        result = parse_unstrict_url(parsed_url, settings=settings)
+
+        assert result is None
+
+    def test_disabled_pull_request_review_comments(self) -> None:
+        """Test that PR review comments are not parsed when disabled."""
+        settings = ghretos.MatcherSettings(
+            require_strict_type=False, pull_request_review_comments=False
+        )
+        url = "https://github.com/owner/repo/issues/123/files#r456"
+        parsed_url = yarl.URL(url)
+
+        result = parse_unstrict_url(parsed_url, settings=settings)
+
+        assert result is None
+
+    # --- Cross-Type Fragment Support ---
+    def test_issue_fragment_on_pull_url(
+        self, unstrict_settings: ghretos.MatcherSettings
+    ) -> None:
+        """Test that #issue- fragment on /pull/ URL returns PullRequest."""
+        url = "https://github.com/owner/repo/pull/123#issue-123"
+        parsed_url = yarl.URL(url)
+
+        result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
+
+        assert isinstance(result, ghretos.PullRequest)
+        assert result.number == 123
+
+    def test_discussion_fragment_on_issue_url(
+        self, unstrict_settings: ghretos.MatcherSettings
+    ) -> None:
+        """Test that #discussion- fragment on /issues/ URL returns Discussion."""
+        url = "https://github.com/owner/repo/issues/456#discussion-456"
+        parsed_url = yarl.URL(url)
+
+        result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
+
+        assert isinstance(result, ghretos.Discussion)
+        assert result.number == 456
+
+    # --- Edge Cases ---
+    def test_multiple_resource_types_with_same_number(
+        self, unstrict_settings: ghretos.MatcherSettings
+    ) -> None:
+        """Test that different URL patterns for same number return appropriate types."""
+        number = 42
+
+        # Issue
+        url_issue = f"https://github.com/owner/repo/issues/{number}"
+        result_issue = parse_unstrict_url(
+            yarl.URL(url_issue), settings=unstrict_settings
+        )
+        assert isinstance(result_issue, ghretos.Issue)
+        assert result_issue.number == number
+
+        # Pull Request
+        url_pr = f"https://github.com/owner/repo/pull/{number}"
+        result_pr = parse_unstrict_url(yarl.URL(url_pr), settings=unstrict_settings)
+        assert isinstance(result_pr, ghretos.PullRequest)
+        assert result_pr.number == number
+
+        # Discussion
+        url_disc = f"https://github.com/owner/repo/discussions/{number}"
+        result_disc = parse_unstrict_url(yarl.URL(url_disc), settings=unstrict_settings)
+        assert isinstance(result_disc, ghretos.Discussion)
+        assert result_disc.number == number
+
+    def test_fallback_to_none_for_unsupported_patterns(
+        self, unstrict_settings: ghretos.MatcherSettings
+    ) -> None:
+        """Test that unsupported URL patterns return None."""
+        unsupported_urls = [
+            "https://github.com/owner/repo/tree/main",
+            "https://github.com/owner/repo/blob/main/file.py",
+            "https://github.com/owner/repo/wiki",
+            "https://github.com/owner/repo/issues/123/something/invalid",
+        ]
+
+        for url in unsupported_urls:
+            result = parse_unstrict_url(yarl.URL(url), settings=unstrict_settings)
+            assert result is None, f"Expected None for {url}"

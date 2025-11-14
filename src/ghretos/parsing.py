@@ -274,24 +274,38 @@ def _parse_unstrict_url(parsed_url: yarl.URL, *, settings: models.MatcherSetting
         case [
             owner,
             repo,
-            "issue" | "pull" | "discussions" as resource_type,
+            "issues" | "pull" | "discussions" as resource_type,
             resource_id,
             fragment,
-        ] if settings.issues and fragment.startswith(("#issue-", "#discussion-")):
+        ] if fragment.startswith(("#issue-", "#discussion-")):
             if not resource_id.isdigit():
                 return None
             if fragment.startswith("#issue-"):
                 if resource_type == "pull":
-                    return models.PullRequest(
+                    return (
+                        models.PullRequest(
+                            repo=models.Repo(name=repo, owner=owner),
+                            number=int(resource_id),
+                        )
+                        if settings.pull_requests
+                        else None
+                    )
+                return (
+                    models.Issue(
                         repo=models.Repo(name=repo, owner=owner),
                         number=int(resource_id),
                     )
-                return models.Issue(
-                    repo=models.Repo(name=repo, owner=owner), number=int(resource_id)
+                    if settings.issues
+                    else None
                 )
             elif fragment.startswith("#discussion-"):
-                return models.Discussion(
-                    repo=models.Repo(name=repo, owner=owner), number=int(resource_id)
+                return (
+                    models.Discussion(
+                        repo=models.Repo(name=repo, owner=owner),
+                        number=int(resource_id),
+                    )
+                    if settings.discussions
+                    else None
                 )
             return None
         case [
@@ -301,15 +315,29 @@ def _parse_unstrict_url(parsed_url: yarl.URL, *, settings: models.MatcherSetting
             resource_id,
             fragment,
         ] if settings.pull_request_review_comments and (
-            fragment.startswith(("pullrequestreview-", "discussion_r"))
+            fragment.startswith(("#pullrequestreview-", "#discussion_r"))
         ):
             if not resource_id.isdigit():
                 return None
-            return models.PullRequestReviewComment(
-                repo=models.Repo(name=repo, owner=owner),
-                number=int(resource_id),
-                comment_id=int(fragment),
-            )
+            if fragment.startswith("#pullrequestreview-"):
+                review_id = fragment.removeprefix("#pullrequestreview-")
+                if not review_id.isdigit():
+                    return None
+                return models.PullRequestReview(
+                    repo=models.Repo(name=repo, owner=owner),
+                    number=int(resource_id),
+                    review_id=int(review_id),
+                )
+            elif fragment.startswith("#discussion_r"):
+                comment_id = fragment.removeprefix("#discussion_r")
+                if not comment_id.isdigit():
+                    return None
+                return models.PullRequestReviewComment(
+                    repo=models.Repo(name=repo, owner=owner),
+                    number=int(resource_id),
+                    comment_id=int(comment_id),
+                )
+            return None
         # Pull request review comments on commits page with SHA (allow /issues/ URLs)
         case [
             owner,
