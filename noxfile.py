@@ -126,7 +126,7 @@ def pyright(session: nox.Session) -> None:
     args = ["--venvpath", session.virtualenv.location, *session.posargs]
 
     try:
-        session.run("python", "-m", "pyright", *args, env=env)
+        session.run("python", "-m", "basedpyright", *args, env=env)
     except KeyboardInterrupt:
         session.error("Quit pyright")
 

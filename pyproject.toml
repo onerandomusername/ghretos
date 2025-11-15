@@ -20,9 +20,9 @@ test = [
     "pytest>=8.4.2",
 ]
 tools = [
+    "basedpyright>=1.33.0",
     "nox>=2025.11.12",
     "prek>=0.2.1,<0.3",
-    "pyright>=1.1.407",
     "ruff>=0.14.5",
 ]
 
