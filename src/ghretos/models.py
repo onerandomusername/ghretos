@@ -45,15 +45,20 @@ class GitHubResource:
 
 @dataclass_deco
 class User(GitHubResource):
+    """Represents a GitHub user."""
+
     login: str
+    """The username/login of the GitHub user."""
 
 
 @dataclass_deco
 class Repo(GitHubResource):
     name: str
+    """The name of the repository."""
 
     # flattened user
     owner: str
+    """The owner of the repository."""
 
     @property
     def full_name(self) -> str:
@@ -71,17 +76,24 @@ class NumberedResource(GitHubResource):
     """Special base class for resources with numbers.
 
     This is used for shorthand parsing for numbered resources, where the specific type is not known.
+
+    This can represent either a :py:class:`Issue`, :py:class:`PullRequest`, or
+    :py:class:`Discussion`.
     """
 
     repo: Repo
+    """The repository the resource belongs to."""
     number: int
+    """The number of the resource."""
 
 
 ## ISSUES
 @dataclass_deco
 class _Issue(GitHubResource):
     repo: Repo
+    """The repository the issue belongs to."""
     number: int
+    """The number of the issue."""
 
 
 @dataclass_deco
@@ -92,11 +104,13 @@ class Issue(_Issue):
 @dataclass_deco
 class IssueComment(_Issue):
     comment_id: int
+    """The ID of the comment."""
 
 
 @dataclass_deco
 class IssueEvent(_Issue):
     event_id: int
+    """The ID of the event."""
 
 
 ## PULL REQUESTS
@@ -106,6 +120,7 @@ class IssueEvent(_Issue):
 class _PullRequest(GitHubResource):
     repo: Repo
     number: int
+    """The number of the pull request."""
 
 
 @dataclass_deco
@@ -116,6 +131,7 @@ class PullRequest(_PullRequest):
 @dataclass_deco
 class PullRequestComment(_PullRequest):
     comment_id: int
+    """The ID of the comment."""
 
 
 @dataclass_deco

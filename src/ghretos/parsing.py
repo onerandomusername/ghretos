@@ -468,7 +468,7 @@ def parse_url(
     such in the API. This method still distinguishes them for clarity.
 
     .. note::
-        Unlike :py:obj:`parse_shorthand`, this method returns a separate PullRequest type for pull
+        Unlike :py:obj:`.parse_shorthand`, this method returns a separate PullRequest type for pull
         requests. However, since pull requests are represented as issues in GitHub's data model and
         API, this distinction is primarily for clarity. In addition, unsanitized input URLs may lead
         to unexpected results. Do not assume a PullRequest actually refers to a pull request.

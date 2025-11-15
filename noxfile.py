@@ -131,6 +131,37 @@ def pyright(session: nox.Session) -> None:
         session.error("Quit pyright")
 
 
+@nox.session(python="3.11")
+def docs(session: nox.Session) -> None:
+    """Build and generate the documentation.
+
+    If running locally, will build automatic reloading docs.
+    If running in CI, will build a production version of the documentation.
+    """
+    install_deps(session, groups=["docs"])
+    with session.chdir("docs"):
+        args = ["-b", "html", "-n", ".", "_build/html", *session.posargs]
+        if session.interactive:
+            session.run(
+                "sphinx-autobuild",
+                "--ignore",
+                "_build",
+                "--watch",
+                "../src/ghretos",
+                "--port",
+                "8008",
+                "-j",
+                "auto",
+                *args,
+            )
+        else:
+            session.run(
+                "sphinx-build",
+                "-aE",
+                *args,
+            )
+
+
 @nox.session(tags=("ci",), python=ALL_PYTHONS)
 def test(session: nox.Session) -> None:
     """Run pytest tests."""
