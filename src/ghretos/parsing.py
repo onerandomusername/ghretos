@@ -1,27 +1,30 @@
-"""Implement the parsing aspect of GitHub.com URLs and shorthands.
+"""This is the parsing aspect of GitHub.com URLs and shorthands.
 
 GitHub's api schema for (supported) types are the following:
-Issue: /{owner}/{repo}/issues/{issue_number}
-Pull Request: /{owner}/{repo}/pull/{pr_number}
-Branch/Tag/Commit: /{owner}/{repo}/tree/{ref}
-Discussion: /{owner}/{repo}/discussions/{discussion_number}
-Tag: https://github.com/{owner}/{repo}/releases/tag/{tag}
 
-in addition, issues, pull requests, and commits support comments
-Issue Comment: /{owner}/{repo}/issues/{issue_number}#issuecomment-{comment_id}
-Pull Request Comment: /{owner}/{repo}/pull/{pr_number}#issuecomment-{comment_id}
-Discussion Comment: /{owner}/{repo}/discussions/{discussion_number}#discussioncomment-{comment_id}
-Commit Comment: /{owner}/{repo}/commit/{commit_sha}#commitcomment-{comment_id}
+- Issue: ``/{owner}/{repo}/issues/{issue_number}``
+- Pull Request: ``/{owner}/{repo}/pull/{pr_number}``
+- Branch/Tag/Commit: ``/{owner}/{repo}/tree/{ref}``
+- Discussion: ``/{owner}/{repo}/discussions/{discussion_number}``
+- Tag: ``/{owner}/{repo}/releases/tag/{tag}``
 
-issues and pull requests also support events
-Issue Event: /{owner}/{repo}/issues/{issue_number}#event-{event_id}
-Pull Request Event: /{owner}/{repo}/pull/{pr_number}#event-{event_id}
+In addition, issues, pull requests, and commits support comments:
+
+- Issue Comment: ``/{owner}/{repo}/issues/{issue_number}#issuecomment-{comment_id}``
+- Pull Request Comment: ``/{owner}/{repo}/pull/{pr_number}#issuecomment-{comment_id}``
+- Discussion Comment: ``/{owner}/{repo}/discussions/{discussion_number}#discussioncomment-{comment_id}``
+- Commit Comment: ``/{owner}/{repo}/commit/{commit_sha}#commitcomment-{comment_id}``
+
+Issues and pull requests also support events:
+
+- Issue Event: ``/{owner}/{repo}/issues/{issue_number}#event-{event_id}``
+- Pull Request Event: ``/{owner}/{repo}/pull/{pr_number}#event-{event_id}``
 
 Pull Requests support reviews and review comments:
-/{owner}/{repo}/pull/{pr_number}#pullrequestreview-3373902296
-/{owner}/{repo}/pull/{pr_number}#discussion_r2269233870
 
-"""
+- Review: ``/{owner}/{repo}/pull/{pr_number}#pullrequestreview-3373902296``
+- Review comments: ``/{owner}/{repo}/pull/{pr_number}#discussion_r2269233870``
+"""  # noqa: E501
 
 import string
 
@@ -457,13 +460,6 @@ def parse_url(
 ) -> models.GitHubResource | None:
     """Parses a GitHub URL into its corresponding resource.
 
-    This parses the following URL types:
-    - User profile: https://github.com/{username}
-    - Repository: https://github.com/{username}/{repo}
-    - Issue: https://github.com/{username}/{repo}/issues/{issue_number}
-    - Pull Request: https://github.com/{username}/{repo}/pull/{pr_number}
-    - Issue Comment: https://github.com/{username}/{repo}/issues/{issue_number}#issuecomment-{comment_id}
-
     Please note that PullRequests are a type of Issue in GitHub's data model, and are represented as
     such in the API. This method still distinguishes them for clarity.
 
@@ -475,7 +471,7 @@ def parse_url(
 
     Args:
         url: The URL to parse.
-        settings: Settings for the URL matcher.
+        settings: :obj:`.MatcherSettings` for the URL matcher.
     Returns:
         A ParsedResource instance if the URL corresponds to a known GitHub resource,
         None otherwise.

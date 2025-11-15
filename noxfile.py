@@ -148,6 +148,8 @@ def docs(session: nox.Session) -> None:
                 "_build",
                 "--watch",
                 "../src/ghretos",
+                "--watch",
+                "../README.md",
                 "--port",
                 "8008",
                 "-j",

@@ -40,7 +40,7 @@ else:
 
 
 class GitHubResource:
-    pass
+    """Base class for all GitHub resources."""
 
 
 @dataclass_deco
@@ -98,17 +98,26 @@ class _Issue(GitHubResource):
 
 @dataclass_deco
 class Issue(_Issue):
-    pass
+    """Represents a GitHub issue."""
+
+    repo: Repo
+    number: int
 
 
 @dataclass_deco
 class IssueComment(_Issue):
+    repo: Repo
+    number: int
+
     comment_id: int
     """The ID of the comment."""
 
 
 @dataclass_deco
 class IssueEvent(_Issue):
+    repo: Repo
+    number: int
+
     event_id: int
     """The ID of the event."""
 
@@ -119,41 +128,71 @@ class IssueEvent(_Issue):
 @dataclass_deco
 class _PullRequest(GitHubResource):
     repo: Repo
+    """The repository the pull request belongs to."""
     number: int
     """The number of the pull request."""
 
 
 @dataclass_deco
 class PullRequest(_PullRequest):
-    pass
+    """Represents a GitHub pull request."""
+
+    repo: Repo
+    number: int
 
 
 @dataclass_deco
 class PullRequestComment(_PullRequest):
+    """Represents a comment on a GitHub pull request."""
+
+    repo: Repo
+    number: int
+
     comment_id: int
     """The ID of the comment."""
 
 
 @dataclass_deco
 class PullRequestReview(_PullRequest):
+    """Represents a review on a GitHub pull request."""
+
+    repo: Repo
+    number: int
+
     review_id: int
+    """The ID of the review."""
 
 
 @dataclass_deco
 class PullRequestReviewComment(_PullRequest):
+    """Represents a review comment on a GitHub pull request."""
+
+    repo: Repo
+    number: int
+
     comment_id: int
+    """The ID of the review comment."""
 
     # these comments are special and can live on multiple pages:
     # pull/<num>/commits/<sha>#r<ID>
     # pull/files#r<ID>
     sha: str | None = None
+    """The SHA of the commit the comment is on, if applicable."""
     commit_page: bool = False
+    """Whether the comment was found on a commit page."""
     files_page: bool = False
+    """Whether the comment was found on the files page."""
 
 
 @dataclass_deco
 class PullRequestEvent(_PullRequest):
+    """Represents an event on a GitHub pull request."""
+
+    repo: Repo
+    number: int
+
     event_id: int
+    """The ID of the event."""
 
 
 ### DISCUSSIONS
@@ -162,18 +201,28 @@ class PullRequestEvent(_PullRequest):
 @dataclass_deco
 class _Discussion(GitHubResource):
     repo: Repo
+    """The repository the discussion belongs to."""
     number: int
+    """The number of the discussion."""
 
 
 @dataclass_deco
 class Discussion(_Discussion):
+    """Represents a GitHub discussion."""
+
     repo: Repo
     number: int
 
 
 @dataclass_deco
 class DiscussionComment(_Discussion):
+    """Represents a comment on a GitHub discussion."""
+
+    repo: Repo
+    number: int
+
     comment_id: int
+    """The ID of the comment."""
 
 
 ## COMMITS
@@ -182,46 +231,89 @@ class DiscussionComment(_Discussion):
 @dataclass_deco
 class _Commit(GitHubResource):
     repo: Repo
+    """The repository the commit belongs to."""
     sha: str
+    """The SHA of the commit."""
 
 
 @dataclass_deco
 class Commit(_Commit):
-    pass
+    """Represents a GitHub commit."""
+
+    repo: Repo
+    sha: str
 
 
 @dataclass_deco
 class CommitComment(_Commit):
+    """Represents a comment on a GitHub commit."""
+
+    repo: Repo
+    sha: str
+
     comment_id: int
+    """The ID of the comment."""
 
 
 @dataclass_deco
 class ReleaseTag(GitHubResource):
+    """Represents a GitHub release tag."""
+
     repo: Repo
+    """The repository the release belongs to."""
     tag: str
+    """The tag name of the release."""
 
 
 @dataclasses.dataclass
 class MatcherSettings:
+    """Settings for matching GitHub URLs and shorthands.
+
+    Each of these settings are completely seperate: disabling one does not affect the others.
+    For example, disabling `issues` will not disable `issue_comments`.
+    """
+
     domains: list[str] = dataclasses.field(default_factory=lambda: ["github.com"])
+    """List of domains to consider as GitHub domains."""
     issues: bool = True
+    """Whether to match ``/owner/repo/issues/{number}`` URLs."""
     issue_comments: bool = True
+    """Whether to match ``/owner/repo/issues/{number}#issuecomment-{number}`` issue comment URLs."""
     issue_events: bool = True
+    """Whether to match ``/owner/repo/issues/{number}#event-{number}`` issue event URLs."""
     pull_requests: bool = True
+    """Whether to match ``/owner/repo/pull/{number}`` URLs."""
     pull_request_comments: bool = True
+    """Whether to match ``/owner/repo/pull/{number}#issuecomment-{number}``
+    pull request comment URLs."""
     pull_request_reviews: bool = True
+    """Whether to match ``/owner/repo/pull/{number}#review-{number}`` pull request review URLs."""
     pull_request_review_comments: bool = True
+    """Whether to match ``/owner/repo/pull/{number}#pullrequestreviewcomment-{number}``
+    pull request review comment URLs."""
     pull_request_events: bool = True
+    """Whether to match ``/owner/repo/pull/{number}#event-{number}`` pull request event URLs."""
     discussions: bool = True
+    """Whether to match ``/owner/repo/discussions/{number}`` URLs."""
     discussion_comments: bool = True
+    """Whether to match ``/owner/repo/discussions/{number}#discussioncomment-{number}``
+    discussion comment URLs."""
     commits: bool = True
+    """Whether to match ``/owner/repo/commit/{sha}`` URLs."""
     commit_comments: bool = True
+    """Whether to match ``/owner/repo/commit/{sha}#commitcomment-{number}`` commit comment URLs."""
     releases: bool = True
+    """Whether to match ``/owner/repo/releases/tag/{tag}`` URLs."""
 
     shorthand: bool = True
+    """Whether to match shorthand notations like `owner/repo#number`.
+    UNLIKE other setting, this is required to enable shorthand parsing."""
     short_repo: bool = True
+    """Whether to support short repository names in shorthands (e.g., `repo#number`)."""
     short_numberables: bool = True
+    """Whether to support shorthand notations such as ``owner/repo#number``."""
     short_refs: bool = True
+    """Whether to support shorthand notations such as ``owner/repo@ref``."""
 
     require_strict_type: bool = True
     """Whether to support /issues/, /pulls/, and /discussions/ only for their respective types.
