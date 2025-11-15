@@ -26,6 +26,7 @@ test = [
     "hypothesis>=6.148.0",
     "pytest>=9.0.1",
     "pytest-cov>=7.0.0",
+    "pytest-xdist>=3.8.0",
 ]
 tools = [
     "basedpyright>=1.33.0",
