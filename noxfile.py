@@ -168,7 +168,14 @@ def docs(session: nox.Session) -> None:
 def test(session: nox.Session) -> None:
     """Run pytest tests."""
     install_deps(session, groups=["test"])
-    session.run("pytest", *session.posargs)
+    args = session.posargs
+
+    global reset_coverage
+    if reset_coverage:
+        reset_coverage = False
+    else:
+        args = ["--cov-append", *args]
+    session.run("pytest", *args)
 
 
 @nox.session(default=False, python=False)

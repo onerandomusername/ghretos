@@ -1,5 +1,10 @@
+import string
+
+import hypothesis
 import pytest
 import yarl
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 import ghretos
 from ghretos.parsing import (
@@ -10,23 +15,17 @@ from ghretos.parsing import (
 )
 
 
-@pytest.mark.parametrize(
-    ("url", "expected_type"),
-    [
-        ("https://github.com/owner/repo/issues/123#event-456", ghretos.IssueEvent),
-        (
-            "https://github.com/owner/repo/pull/123#pullrequestreview-456",
-            ghretos.PullRequestReview,
-        ),
-        (
-            "https://github.com/owner/repo/discussions/123#discussioncomment-456",
-            ghretos.DiscussionComment,
-        ),
-    ],
+USER = st.from_regex(r"^[a-zA-Z0-9-]{1,39}$", fullmatch=True).filter(
+    lambda s: not s.startswith("-") and not s.endswith("-")
 )
-def test_parse_github_url_type(url: str, expected_type: type[ghretos.GitHubResource]) -> None:
-    resource = ghretos.parse_url(url)
-    assert isinstance(resource, expected_type)
+REPO_NAME = st.from_regex(r"^[0-9._-]{1,100}$", fullmatch=True).filter(
+    lambda s: s not in (".", "..")
+)
+NUMBERABLE = st.integers(min_value=1)
+ID = st.integers(min_value=1, max_value=2**31 - 1)
+SHA = st.text("0123456789abcdefABCDEF", min_size=6, max_size=40)
+REF = st.text(string.ascii_letters + string.digits + "-._/", min_size=1)
+COMMENT_ID = st.integers(min_value=1)
 
 
 @pytest.mark.parametrize(
@@ -83,17 +82,11 @@ class TestParseNumberableUrl:
     """Test suite for the _parse_strict_url and _parse_unstrict_url functions."""
 
     # --- Basic Issues ---
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number"),
-        [
-            ("owner", "repo", 1),
-            ("owner", "repo", 123),
-            ("owner", "repo", 999999),
-            ("my-org", "my-project", 42),
-            ("User123", "Repo_Name", 7),
-            ("a", "b", 1),
-            ("very-long-owner-name-123", "very-long-repo-name-456", 12345),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
     )
     def test_basic_issue(
         self,
@@ -112,13 +105,12 @@ class TestParseNumberableUrl:
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
 
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number", "fragment"),
-        [
-            ("owner", "repo", 1, "issue-1"),
-            ("owner", "repo", 123, "issue-123"),
-            ("my-org", "my-project", 42, "issue-42"),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
+        fragment=COMMENT_ID,
     )
     def test_issue_with_issue_fragment(
         self,
@@ -129,7 +121,7 @@ class TestParseNumberableUrl:
         default_settings: ghretos.MatcherSettings,
     ) -> None:
         """Test parsing issue URLs with #issue-XXX fragments."""
-        url = f"https://github.com/{owner}/{repo_name}/issues/{number}#{fragment}"
+        url = f"https://github.com/{owner}/{repo_name}/issues/{number}#issue-{fragment}"
         parsed_url = yarl.URL(url)
 
         result = parse_strict_url(parsed_url, settings=default_settings)
@@ -138,14 +130,11 @@ class TestParseNumberableUrl:
         assert result.number == number
 
     # --- Basic Pull Requests ---
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number"),
-        [
-            ("owner", "repo", 1),
-            ("owner", "repo", 456),
-            ("org-name", "repo-name", 9999),
-            ("a", "b", 1),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
     )
     def test_basic_pull_request(
         self,
@@ -165,13 +154,11 @@ class TestParseNumberableUrl:
         assert result.number == number
 
     # --- Basic Discussions ---
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number"),
-        [
-            ("owner", "repo", 1),
-            ("owner", "repo", 789),
-            ("my-org", "discussions", 123),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
     )
     def test_basic_discussion(
         self,
@@ -191,23 +178,23 @@ class TestParseNumberableUrl:
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
 
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number", "fragment"),
-        [
-            ("owner", "repo", 1, "discussion-1"),
-            ("owner", "repo", 123, "discussion-123"),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
+        fragment=COMMENT_ID,
     )
     def test_discussion_with_discussion_fragment(
         self,
         owner: str,
         repo_name: str,
         number: int,
-        fragment: str,
+        fragment: int,
         default_settings: ghretos.MatcherSettings,
     ) -> None:
         """Test parsing discussion URLs with #discussion-XXX fragments."""
-        url = f"https://github.com/{owner}/{repo_name}/discussions/{number}#{fragment}"
+        url = f"https://github.com/{owner}/{repo_name}/discussions/{number}#discussion-{fragment}"
         parsed_url = yarl.URL(url)
 
         result = parse_strict_url(parsed_url, settings=default_settings)
@@ -216,14 +203,12 @@ class TestParseNumberableUrl:
         assert result.number == number
 
     # --- Issue Comments ---
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number", "comment_id"),
-        [
-            ("owner", "repo", 1, 100),
-            ("owner", "repo", 123, 456789),
-            ("my-org", "my-repo", 999, 1),
-            ("test-user", "test-repo", 42, 9876543210),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
+        comment_id=COMMENT_ID,
     )
     def test_issue_comment(
         self,
@@ -245,13 +230,12 @@ class TestParseNumberableUrl:
         assert result.comment_id == comment_id
 
     # --- Pull Request Comments ---
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number", "comment_id"),
-        [
-            ("owner", "repo", 1, 100),
-            ("owner", "repo", 456, 789),
-            ("org", "project", 999, 123456),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
+        comment_id=COMMENT_ID,
     )
     def test_pull_request_comment(
         self,
@@ -273,13 +257,12 @@ class TestParseNumberableUrl:
         assert result.comment_id == comment_id
 
     # --- Issue Events ---
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number", "event_id"),
-        [
-            ("owner", "repo", 1, 100),
-            ("owner", "repo", 123, 456),
-            ("test-org", "test-repo", 999, 9999999),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
+        event_id=COMMENT_ID,
     )
     def test_issue_event(
         self,
@@ -301,13 +284,12 @@ class TestParseNumberableUrl:
         assert result.event_id == event_id
 
     # --- Pull Request Events ---
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number", "event_id"),
-        [
-            ("owner", "repo", 1, 100),
-            ("owner", "repo", 456, 789),
-            ("org", "project", 12, 34567),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
+        event_id=COMMENT_ID,
     )
     def test_pull_request_event(
         self,
@@ -329,13 +311,12 @@ class TestParseNumberableUrl:
         assert result.event_id == event_id
 
     # --- Pull Request Reviews ---
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number", "review_id"),
-        [
-            ("owner", "repo", 1, 100),
-            ("owner", "repo", 123, 3373902296),
-            ("test-org", "test-repo", 999, 12345),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
+        review_id=COMMENT_ID,
     )
     def test_pull_request_review(
         self,
@@ -357,13 +338,12 @@ class TestParseNumberableUrl:
         assert result.review_id == review_id
 
     # --- Pull Request Review Comments (discussion_r) ---
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number", "comment_id"),
-        [
-            ("owner", "repo", 1, 100),
-            ("owner", "repo", 123, 2269233870),
-            ("test-org", "test-repo", 456, 98765),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
+        comment_id=COMMENT_ID,
     )
     def test_pull_request_review_comment_discussion_r(
         self,
@@ -388,14 +368,13 @@ class TestParseNumberableUrl:
         assert result.files_page is False
 
     # --- Pull Request Review Comments on commits page ---
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number", "sha", "comment_id"),
-        [
-            ("owner", "repo", 1, "abc123", 100),
-            ("owner", "repo", 123, "deadbeef", 456),
-            ("test-org", "test-repo", 456, "1234567890abcdef", 789),
-            ("org", "project", 999, "a1b2c3d4e5f6", 12345),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
+        sha=SHA,
+        comment_id=COMMENT_ID,
     )
     def test_pull_request_review_comment_commits_page(
         self,
@@ -421,13 +400,12 @@ class TestParseNumberableUrl:
         assert result.files_page is False
 
     # --- Pull Request Review Comments on files page ---
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number", "comment_id"),
-        [
-            ("owner", "repo", 1, 100),
-            ("owner", "repo", 123, 456),
-            ("test-org", "test-repo", 456, 789012),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
+        comment_id=COMMENT_ID,
     )
     def test_pull_request_review_comment_files_page(
         self,
@@ -452,13 +430,12 @@ class TestParseNumberableUrl:
         assert result.files_page is True
 
     # --- Discussion Comments ---
-    @pytest.mark.parametrize(
-        ("owner", "repo_name", "number", "comment_id"),
-        [
-            ("owner", "repo", 1, 100),
-            ("owner", "repo", 123, 456789),
-            ("test-org", "test-repo", 999, 98765432),
-        ],
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(
+        owner=USER,
+        repo_name=REPO_NAME,
+        number=NUMBERABLE,
+        comment_id=COMMENT_ID,
     )
     def test_discussion_comment(
         self,
@@ -985,3 +962,25 @@ class TestParseUnstrictUrl:
         assert result is not None
         assert isinstance(result, expected_type)
         assert result.comment_id == expected_comment_id
+
+
+class TestShorthand:
+    @given(owner=USER, repo_name=REPO_NAME, number=NUMBERABLE)
+    def test_shorthand_numberable(self, owner: str, repo_name: str, number: int) -> None:
+        """Test parsing shorthand issue notation."""
+        shorthand = f"{owner}/{repo_name}#{number}"
+        result = ghretos.parse_shorthand(shorthand)
+
+        assert isinstance(result, ghretos.NumberedResource)
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
+        assert result.number == number
+
+    @given(owner=USER, repo_name=REPO_NAME, ref=REF)
+    def test_shorthand_ref(self, owner: str, repo_name: str, ref: str) -> None:
+        """Test parsing shorthand issue notation."""
+        shorthand = f"{owner}/{repo_name}@{ref}"
+        result = ghretos.parse_shorthand(shorthand)
+
+        assert isinstance(result, ghretos.Ref)
+        assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
+        assert result.ref == ref

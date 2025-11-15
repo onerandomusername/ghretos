@@ -1,6 +1,6 @@
 import dataclasses
 import functools
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 
 __all__ = (
@@ -262,7 +262,17 @@ class ReleaseTag(GitHubResource):
     repo: Repo
     """The repository the release belongs to."""
     tag: str
-    """The tag name of the release."""
+    """The tag associated with this release."""
+
+
+@dataclass_deco
+class Ref(GitHubResource):
+    """Represents a GitHub ref such as a tag, branch, or commit."""
+
+    repo: Repo
+    """The repository the release belongs to."""
+    ref: str
+    """The provided ref."""
 
 
 @dataclasses.dataclass
@@ -343,19 +353,3 @@ class MatcherSettings:
             short_numberables=False,
             short_refs=False,
         )
-
-    def _supported_resource_types(
-        self,
-    ) -> set[Literal["issues", "pull", "discussions", "commit", "releases"]]:
-        types: set[Literal["issues", "pull", "discussions", "commit", "releases"]] = set()
-        if self.issues:
-            types.add("issues")
-        if self.pull_requests:
-            types.add("pull")
-        if self.discussions:
-            types.add("discussions")
-        if self.commits:
-            types.add("commit")
-        if self.releases:
-            types.add("releases")
-        return types

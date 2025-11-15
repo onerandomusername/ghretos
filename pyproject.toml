@@ -22,7 +22,10 @@ docs = [
     "sphinx-autobuild>=2024.10.3",
 ]
 test = [
-    "pytest>=8.4.2",
+    "coverage>=7.11.3",
+    "hypothesis>=6.148.0",
+    "pytest>=9.0.1",
+    "pytest-cov>=7.0.0",
 ]
 tools = [
     "basedpyright>=1.33.0",
@@ -103,3 +106,13 @@ max-complexity = 20
 include = ["src", "*.py"]
 reportUnnecessaryTypeIgnoreComment = true
 typeCheckingMode = "strict"
+
+[tool.pytest]
+addopts = ["--cov"]
+
+[tool.coverage.run]
+branch = true
+include = [
+    "src/ghretos/*",
+    "tests/*",
+]

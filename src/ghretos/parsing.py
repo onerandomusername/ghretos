@@ -597,7 +597,7 @@ def parse_shorthand(
         )
     elif ref_type == "@":
         return (
-            models.ReleaseTag(repo=models.Repo(name=repo, owner=user), tag=ref)
+            models.Ref(repo=models.Repo(name=repo, owner=user), ref=ref)
             if settings.short_refs
             else None
         )

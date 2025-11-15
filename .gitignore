@@ -11,3 +11,9 @@ wheels/
 
 # Sphinx documentation artifacts
 docs/_build/
+
+# Coverage
+.coverage
+
+# hypothesis
+.hypothesis/
