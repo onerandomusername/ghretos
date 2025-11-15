@@ -4,6 +4,8 @@ import yarl
 import ghretos
 from ghretos.parsing import (
     _parse_strict_url as parse_strict_url,  # pyright: ignore[reportPrivateUsage]
+)
+from ghretos.parsing import (
     _parse_unstrict_url as parse_unstrict_url,  # pyright: ignore[reportPrivateUsage]
 )
 
@@ -22,7 +24,7 @@ from ghretos.parsing import (
         ),
     ],
 )
-def test_parse_github_url_type(url: str, expected_type: type[ghretos.GitHubResource]):
+def test_parse_github_url_type(url: str, expected_type: type[ghretos.GitHubResource]) -> None:
     resource = ghretos.parse_url(url)
     assert isinstance(resource, expected_type)
 
@@ -62,7 +64,7 @@ def test_parse_github_url_type(url: str, expected_type: type[ghretos.GitHubResou
 )
 def test_parse_github_url_various(
     url: str, expected_type: type[ghretos.GitHubResource] | None
-):
+) -> None:
     resource = ghretos.parse_url(url)
     if expected_type is None:
         assert resource is None
@@ -72,7 +74,7 @@ def test_parse_github_url_various(
 
 # Test cases for _parse_strict_url and _parse_unstrict_url
 @pytest.fixture
-def default_settings():
+def default_settings() -> ghretos.MatcherSettings:
     """Fixture providing default settings with all features enabled."""
     return ghretos.MatcherSettings()
 
@@ -177,7 +179,7 @@ class TestParseNumberableUrl:
         repo_name: str,
         number: int,
         default_settings: ghretos.MatcherSettings,
-    ):
+    ) -> None:
         """Test parsing basic discussion URLs without strict type checking."""
         # With require_strict_type=False, discussions without fragments are supported
         url = f"https://github.com/{owner}/{repo_name}/discussions/{number}"
@@ -436,9 +438,7 @@ class TestParseNumberableUrl:
         default_settings: ghretos.MatcherSettings,
     ) -> None:
         """Test parsing pull request review comments on files page."""
-        url = (
-            f"https://github.com/{owner}/{repo_name}/pull/{number}/files#r{comment_id}"
-        )
+        url = f"https://github.com/{owner}/{repo_name}/pull/{number}/files#r{comment_id}"
         parsed_url = yarl.URL(url)
 
         result = parse_strict_url(parsed_url, settings=default_settings)
@@ -480,9 +480,7 @@ class TestParseNumberableUrl:
         assert result.comment_id == comment_id
 
     # --- Edge Cases: Invalid inputs ---
-    def test_invalid_number_not_digit(
-        self, default_settings: ghretos.MatcherSettings
-    ) -> None:
+    def test_invalid_number_not_digit(self, default_settings: ghretos.MatcherSettings) -> None:
         """Test that non-numeric issue numbers return None."""
         url = "https://github.com/owner/repo/issues/abc"
         parsed_url = yarl.URL(url)
@@ -491,9 +489,7 @@ class TestParseNumberableUrl:
 
         assert result is None
 
-    def test_invalid_comment_id_not_digit(
-        self, default_settings: ghretos.MatcherSettings
-    ) -> None:
+    def test_invalid_comment_id_not_digit(self, default_settings: ghretos.MatcherSettings) -> None:
         """Test that non-numeric comment IDs return None."""
         url = "https://github.com/owner/repo/issues/123#issuecomment-abc"
         parsed_url = yarl.URL(url)
@@ -502,9 +498,7 @@ class TestParseNumberableUrl:
 
         assert result is None
 
-    def test_invalid_sha_non_hex(
-        self, default_settings: ghretos.MatcherSettings
-    ) -> None:
+    def test_invalid_sha_non_hex(self, default_settings: ghretos.MatcherSettings) -> None:
         """Test that non-hexadecimal SHAs in commits page return None."""
         url = "https://github.com/owner/repo/pull/123/commits/xyz123#r456"
         parsed_url = yarl.URL(url)
@@ -524,9 +518,7 @@ class TestParseNumberableUrl:
 
         assert result is None
 
-    def test_invalid_commits_without_sha(
-        self, default_settings: ghretos.MatcherSettings
-    ) -> None:
+    def test_invalid_commits_without_sha(self, default_settings: ghretos.MatcherSettings) -> None:
         """Test that /commits without a SHA returns None."""
         url = "https://github.com/owner/repo/pull/123/commits#r456"
         parsed_url = yarl.URL(url)
@@ -676,7 +668,7 @@ class TestParseUnstrictUrl:
     """Test suite for the _parse_unstrict_url function with require_strict_type=False."""
 
     @pytest.fixture
-    def unstrict_settings(self):
+    def unstrict_settings(self) -> ghretos.MatcherSettings:
         """Fixture providing settings with strict type checking disabled."""
         return ghretos.MatcherSettings(require_strict_type=False)
 
@@ -830,9 +822,7 @@ class TestParseUnstrictUrl:
             "https://github.com/owner/repo/issues/123#unknown-fragment",  # Unknown fragment
         ],
     )
-    def test_invalid_inputs(
-        self, url: str, unstrict_settings: ghretos.MatcherSettings
-    ) -> None:
+    def test_invalid_inputs(self, url: str, unstrict_settings: ghretos.MatcherSettings) -> None:
         """Test that invalid inputs return None."""
         parsed_url = yarl.URL(url)
         result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
@@ -851,9 +841,7 @@ class TestParseUnstrictUrl:
 
     def test_disabled_pull_requests(self) -> None:
         """Test that pull requests are not parsed when disabled."""
-        settings = ghretos.MatcherSettings(
-            require_strict_type=False, pull_requests=False
-        )
+        settings = ghretos.MatcherSettings(require_strict_type=False, pull_requests=False)
         url = "https://github.com/owner/repo/pull/123"
         parsed_url = yarl.URL(url)
 
@@ -884,9 +872,7 @@ class TestParseUnstrictUrl:
         assert result is None
 
     # --- Cross-Type Fragment Support ---
-    def test_issue_fragment_on_pull_url(
-        self, unstrict_settings: ghretos.MatcherSettings
-    ) -> None:
+    def test_issue_fragment_on_pull_url(self, unstrict_settings: ghretos.MatcherSettings) -> None:
         """Test that #issue- fragment on /pull/ URL returns PullRequest."""
         url = "https://github.com/owner/repo/pull/123#issue-123"
         parsed_url = yarl.URL(url)
@@ -917,9 +903,7 @@ class TestParseUnstrictUrl:
 
         # Issue
         url_issue = f"https://github.com/owner/repo/issues/{number}"
-        result_issue = parse_unstrict_url(
-            yarl.URL(url_issue), settings=unstrict_settings
-        )
+        result_issue = parse_unstrict_url(yarl.URL(url_issue), settings=unstrict_settings)
         assert isinstance(result_issue, ghretos.Issue)
         assert result_issue.number == number
 

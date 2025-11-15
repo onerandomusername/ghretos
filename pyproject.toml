@@ -19,3 +19,78 @@ build-backend = "flit_core.buildapi"
 test = [
     "pytest>=8.4.2",
 ]
+tools = [
+    "nox>=2025.11.12",
+    "prek>=0.2.1,<0.3",
+    "pyright>=1.1.407",
+    "ruff>=0.14.5",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+ignore = [
+  # flake8-commas
+  "COM", # Missing Docstrings
+  "D100",
+  "D101",
+  "D104",
+  "D105",
+  "D107", # Docstring Whitespace
+  "D212", # Docstring Content
+  "D401",
+  "D404",
+  "D406",
+  "D407",
+  "D410",
+  "D411",
+  "D416", # Type Annotations
+  "ANN002",
+  "ANN003",
+  "ANN204",
+  "ANN206",
+  "ANN401", # try-except-pass
+  "S110", # temporarily disabled
+  "C901", # mccabe
+  "G004", # Logging statement uses f-string
+  "S101", # Use of `assert` detected
+  "S311", # pseduo-random generators, random is used everywhere for random choices.
+  "ARG",
+  "BLE",
+  "ERA",
+  "FBT",
+  "FIX",
+  "FURB",
+  "PGH",
+  "PLC",
+  "PLR",
+  "PLW",
+  "RET505",
+  "RET506",
+  "RUF012",
+  "SIM105",
+  "SIM108",
+  "SLF",
+  "TD",
+  "TRY",
+]
+select = ["ALL"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["D", "INP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["ghretos"]
+lines-after-imports = 2
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 20
+
+[tool.pyright]
+include = ["src", "*.py"]
+reportUnnecessaryTypeIgnoreComment = true
+typeCheckingMode = "strict"

@@ -1,12 +1,38 @@
+"""Implement the parsing aspect of GitHub.com URLs and shorthands.
+
+GitHub's api schema for (supported) types are the following:
+Issue: /{owner}/{repo}/issues/{issue_number}
+Pull Request: /{owner}/{repo}/pull/{pr_number}
+Branch/Tag/Commit: /{owner}/{repo}/tree/{ref}
+Discussion: /{owner}/{repo}/discussions/{discussion_number}
+Tag: https://github.com/{owner}/{repo}/releases/tag/{tag}
+
+in addition, issues, pull requests, and commits support comments
+Issue Comment: /{owner}/{repo}/issues/{issue_number}#issuecomment-{comment_id}
+Pull Request Comment: /{owner}/{repo}/pull/{pr_number}#issuecomment-{comment_id}
+Discussion Comment: /{owner}/{repo}/discussions/{discussion_number}#discussioncomment-{comment_id}
+Commit Comment: /{owner}/{repo}/commit/{commit_sha}#commitcomment-{comment_id}
+
+issues and pull requests also support events
+Issue Event: /{owner}/{repo}/issues/{issue_number}#event-{event_id}
+Pull Request Event: /{owner}/{repo}/pull/{pr_number}#event-{event_id}
+
+Pull Requests support reviews and review comments:
+/{owner}/{repo}/pull/{pr_number}#pullrequestreview-3373902296
+/{owner}/{repo}/pull/{pr_number}#discussion_r2269233870
+
+"""
+
 import string
 
 import yarl
 
 from ghretos import models
 
+
 __all__ = (
-    "parse_url",
     "parse_shorthand",
+    "parse_url",
 )
 
 
@@ -24,7 +50,7 @@ def _parse_strict_url(
     parsed_url: yarl.URL,
     *,
     settings: models.MatcherSettings,
-):
+) -> models.GitHubResource | None:
     path_and_fragment = list(parsed_url.parts)
     if parsed_url.fragment:
         path_and_fragment.append(f"#{parsed_url.fragment}")
@@ -39,9 +65,7 @@ def _parse_strict_url(
         case [owner, repo, "issues", resource_id] if settings.issues:
             if not resource_id.isdigit():
                 return None
-            return models.Issue(
-                repo=models.Repo(name=repo, owner=owner), number=int(resource_id)
-            )
+            return models.Issue(repo=models.Repo(name=repo, owner=owner), number=int(resource_id))
         case [
             owner,
             repo,
@@ -79,7 +103,6 @@ def _parse_strict_url(
             return models.Discussion(
                 repo=models.Repo(name=repo, owner=owner), number=int(resource_id)
             )
-        # Pull request review comments on specific commit (with SHA) - must come before the pattern without SHA
         case [owner, repo, "pull", resource_id, "commits", sha, fragment] if (
             settings.pull_request_review_comments
             and (fragment := _get_id_from_fragment(parsed_url, "r"))
@@ -124,9 +147,7 @@ def _parse_strict_url(
         ):
             if not resource_id.isdigit():
                 return None
-            return models.Issue(
-                repo=models.Repo(name=repo, owner=owner), number=int(resource_id)
-            )
+            return models.Issue(repo=models.Repo(name=repo, owner=owner), number=int(resource_id))
         # Issue comments
         case [owner, repo, "issues", resource_id, fragment] if (
             settings.issue_comments and fragment.startswith("#issuecomment-")
@@ -199,8 +220,7 @@ def _parse_strict_url(
             )
         # Pull request review comments (discussion_r)
         case [owner, repo, "pull", resource_id, fragment] if (
-            settings.pull_request_review_comments
-            and fragment.startswith("#discussion_r")
+            settings.pull_request_review_comments and fragment.startswith("#discussion_r")
         ):
             if not resource_id.isdigit():
                 return None
@@ -230,9 +250,9 @@ def _parse_strict_url(
             return None
 
 
-def _parse_unstrict_url(parsed_url: yarl.URL, *, settings: models.MatcherSettings):
-    ...
-
+def _parse_unstrict_url(
+    parsed_url: yarl.URL, *, settings: models.MatcherSettings
+) -> models.GitHubResource | None:
     path_and_fragment = list(parsed_url.parts)
     if parsed_url.fragment:
         path_and_fragment.append(f"#{parsed_url.fragment}")
@@ -264,12 +284,11 @@ def _parse_unstrict_url(parsed_url: yarl.URL, *, settings: models.MatcherSetting
                         repo=models.Repo(name=repo, owner=owner),
                         number=int(resource_id),
                     )
-            elif resource_type == "discussions":
-                if settings.discussions:
-                    return models.Discussion(
-                        repo=models.Repo(name=repo, owner=owner),
-                        number=int(resource_id),
-                    )
+            elif resource_type == "discussions" and settings.discussions:
+                return models.Discussion(
+                    repo=models.Repo(name=repo, owner=owner),
+                    number=int(resource_id),
+                )
             return None
         case [
             owner,
@@ -308,9 +327,7 @@ def _parse_unstrict_url(parsed_url: yarl.URL, *, settings: models.MatcherSetting
             "issues" | "pull" | "discussions" as resource_type,
             resource_id,
             fragment,
-        ] if settings.discussion_comments and fragment.startswith(
-            "#discussioncomment-"
-        ):
+        ] if settings.discussion_comments and fragment.startswith("#discussioncomment-"):
             if not resource_id.isdigit():
                 return None
             comment_id = fragment[len("#discussioncomment-") :]
@@ -447,13 +464,14 @@ def parse_url(
     - Pull Request: https://github.com/{username}/{repo}/pull/{pr_number}
     - Issue Comment: https://github.com/{username}/{repo}/issues/{issue_number}#issuecomment-{comment_id}
 
-    Please note that PullRequests are a type of Issue in GitHub's data model, and are represented as such in the API.
-    This method still distinguishes them for clarity.
+    Please note that PullRequests are a type of Issue in GitHub's data model, and are represented as
+    such in the API. This method still distinguishes them for clarity.
 
     .. note::
-        Unlike :py:obj:`parse_shorthand`, this method returns a separate PullRequest type for pull requests.
-        However, since pull requests are represented as issues in GitHub's data model and API, this distinction is primarily for clarity.
-        In addition, unsanitized input URLs may lead to unexpected results. Do not assume a PullRequest actually refers to a pull request.
+        Unlike :py:obj:`parse_shorthand`, this method returns a separate PullRequest type for pull
+        requests. However, since pull requests are represented as issues in GitHub's data model and
+        API, this distinction is primarily for clarity. In addition, unsanitized input URLs may lead
+        to unexpected results. Do not assume a PullRequest actually refers to a pull request.
 
     Args:
         url: The URL to parse.
@@ -462,35 +480,11 @@ def parse_url(
         A ParsedResource instance if the URL corresponds to a known GitHub resource,
         None otherwise.
     """
-    # GitHub's api schema for (supported) types are the following:
-    # Issue: /{owner}/{repo}/issues/{issue_number}
-    # Pull Request: /{owner}/{repo}/pull/{pr_number}
-    # Branch/Tag/Commit: /{owner}/{repo}/tree/{ref}
-    # Discussion: /{owner}/{repo}/discussions/{discussion_number}
-    # Tag: https://github.com/{owner}/{repo}/releases/tag/{tag}
-
-    # in addition, issues, pull requests, and commits support comments
-    # Issue Comment: /{owner}/{repo}/issues/{issue_number}#issuecomment-{comment_id}
-    # Pull Request Comment: /{owner}/{repo}/pull/{pr_number}#issuecomment-{comment_id}
-    # Discussion Comment: /{owner}/{repo}/discussions/{discussion_number}#discussioncomment-{comment_id}
-    # Commit Comment: /{owner}/{repo}/commit/{commit_sha}#commitcomment-{comment_id}
-
-    # issues and pull requests also support events
-    # Issue Event: /{owner}/{repo}/issues/{issue_number}#event-{event_id}
-    # Pull Request Event: /{owner}/{repo}/pull/{pr_number}#event-{event_id}
-
-    # Pull Requests support reviews and review comments:
-    # /{owner}/{repo}/pull/{pr_number}#pullrequestreview-3373902296
-    # /{owner}/{repo}/pull/{pr_number}#discussion_r2269233870
-
     if not isinstance(url, yarl.URL):
         parsed_url = yarl.URL(url)
     else:
         parsed_url = url
-    if (
-        not parsed_url.absolute
-        or parsed_url.host_port_subcomponent not in settings.domains
-    ):
+    if not parsed_url.absolute or parsed_url.host_port_subcomponent not in settings.domains:
         return None
     path_and_fragment = list(parsed_url.parts)
     if parsed_url.fragment:
@@ -601,9 +595,7 @@ def parse_shorthand(
         if not ref.isdigit():
             return None
         return (
-            models.NumberedResource(
-                repo=models.Repo(name=repo, owner=user), number=int(ref)
-            )
+            models.NumberedResource(repo=models.Repo(name=repo, owner=user), number=int(ref))
             if settings.short_numberables
             else None
         )

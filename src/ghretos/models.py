@@ -4,24 +4,24 @@ from typing import TYPE_CHECKING, Literal
 
 
 __all__ = (
+    "Commit",
+    "CommitComment",
+    "Discussion",
+    "DiscussionComment",
     "GitHubResource",
-    "User",
-    "Repo",
-    "NumberedResource",
     "Issue",
     "IssueComment",
     "IssueEvent",
+    "MatcherSettings",
+    "NumberedResource",
     "PullRequest",
     "PullRequestComment",
+    "PullRequestEvent",
     "PullRequestReview",
     "PullRequestReviewComment",
-    "PullRequestEvent",
-    "Discussion",
-    "DiscussionComment",
-    "Commit",
-    "CommitComment",
     "ReleaseTag",
-    "MatcherSettings",
+    "Repo",
+    "User",
 )
 
 if TYPE_CHECKING:
@@ -57,10 +57,12 @@ class Repo(GitHubResource):
 
     @property
     def full_name(self) -> str:
+        """Return the full name of the repository in the format 'owner/name'."""
         return f"{self.owner}/{self.name}"
 
     @property
     def html_url(self) -> str:
+        """Return the HTML URL of the repository. Note this only supports GitHub.com for now."""
         return f"https://github.com/{self.full_name}"
 
 
@@ -68,7 +70,8 @@ class Repo(GitHubResource):
 class NumberedResource(GitHubResource):
     """Special base class for resources with numbers.
 
-    This is used for shorthand parsing for numbered resources, where the specific type is not known."""
+    This is used for shorthand parsing for numbered resources, where the specific type is not known.
+    """
 
     repo: Repo
     number: int
@@ -206,11 +209,13 @@ class MatcherSettings:
 
     require_strict_type: bool = True
     """Whether to support /issues/, /pulls/, and /discussions/ only for their respective types.
-    If this is False, issues, pulls, and discussions will be ignored if the fragment indicates a type only supported by another resource.
+    If this is False, issues, pulls, and discussions will be ignored if the fragment indicates a
+    type only supported by another resource.
     """
 
     @classmethod
     def none(cls) -> "Self":
+        """Return a MatcherSettings instance with all resource types disabled."""
         return cls(
             issues=False,
             issue_comments=False,
@@ -234,9 +239,7 @@ class MatcherSettings:
     def _supported_resource_types(
         self,
     ) -> set[Literal["issues", "pull", "discussions", "commit", "releases"]]:
-        types: set[Literal["issues", "pull", "discussions", "commit", "releases"]] = (
-            set()
-        )
+        types: set[Literal["issues", "pull", "discussions", "commit", "releases"]] = set()
         if self.issues:
             types.add("issues")
         if self.pull_requests:
