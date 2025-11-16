@@ -41,6 +41,39 @@ __all__ = (
 
 _DEFAULT_MATCHER_SETTINGS = models.MatcherSettings()
 
+BLACKLISTED_USER_NAMES = frozenset(
+    (
+        "issues",
+        "pulls",
+        "orgs",
+        "search",
+        "pages",
+        "copilot",
+        "settings",
+        "login",
+        "home",
+        "newsletter",
+        "gist",
+        "codespaces",
+        "new",
+        "notifications",
+        "enterprise",
+        "features",
+        "pricing",
+        "security",
+        "account",
+        "organizations",
+        "edu",
+        "about",
+        "mobile",
+        "marketplace",
+        "mcp",
+        "newsroom",
+        "why-github",
+        "customer-stories",
+    )
+)
+
 
 def _valid_user(user: str) -> bool:
     """Validates a GitHub username according to GitHub's rules."""
@@ -48,7 +81,10 @@ def _valid_user(user: str) -> bool:
         return False
     allowed_chars = string.ascii_letters + string.digits + "-"
 
-    if user[0] == "-" or user[-1] == "-":
+    if user[0] == "-" or user[-1] == "-" or "--" in user:
+        return False
+
+    if user.casefold() in BLACKLISTED_USER_NAMES:
         return False
 
     for char in user:  # noqa: SIM110
