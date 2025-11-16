@@ -1,4 +1,6 @@
 import string
+import unittest.mock
+from collections.abc import Callable
 
 import hypothesis
 import pytest
@@ -7,11 +9,15 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 import ghretos
+from ghretos import parsing
 from ghretos.parsing import (
-    _parse_strict_url as parse_strict_url,  # pyright: ignore[reportPrivateUsage]
+    _parse_loose_numberable_url as parse_unstrict_url,  # pyright: ignore[reportPrivateUsage]
 )
 from ghretos.parsing import (
-    _parse_unstrict_url as parse_unstrict_url,  # pyright: ignore[reportPrivateUsage]
+    _parse_strict_numberable_url as parse_strict_url,  # pyright: ignore[reportPrivateUsage]
+)
+from ghretos.parsing import (
+    _validate_ref as validate_ref,  # pyright: ignore[reportPrivateUsage]
 )
 
 
@@ -24,51 +30,13 @@ REPO_NAME = st.from_regex(r"^[0-9._-]{1,100}$", fullmatch=True).filter(
 NUMBERABLE = st.integers(min_value=1)
 ID = st.integers(min_value=1, max_value=2**31 - 1)
 SHA = st.text("0123456789abcdefABCDEF", min_size=6, max_size=40)
-REF = st.text(string.ascii_letters + string.digits + "-._/", min_size=1)
-COMMENT_ID = st.integers(min_value=1)
-
-
-@pytest.mark.parametrize(
-    ("url", "expected_type"),
-    [
-        ("https://github.com/owner", ghretos.User),
-        ("https://github.com/owner/repo", ghretos.Repo),
-        ("https://github.com/owner/repo/issues/123", ghretos.Issue),
-        (
-            "https://github.com/owner/repo/issues/123#issuecomment-789",
-            ghretos.IssueComment,
-        ),
-        ("https://github.com/owner/repo/pull/123", ghretos.PullRequest),
-        (
-            "https://github.com/owner/repo/pull/123#issuecomment-789",
-            ghretos.PullRequestComment,
-        ),
-        (
-            "https://github.com/owner/repo/pull/123#discussion_r2269233870",
-            ghretos.PullRequestReviewComment,
-        ),
-        ("https://github.com/owner/repo/pull/123#event-999", ghretos.PullRequestEvent),
-        ("https://github.com/owner/repo/discussions/12", ghretos.Discussion),
-        ("https://github.com/owner/repo/commit/abcdef1234", ghretos.Commit),
-        (
-            "https://github.com/owner/repo/commit/abcdef1234#commitcomment-111",
-            ghretos.CommitComment,
-        ),
-        ("https://github.com/owner/repo/releases/tag/v1.2.3", ghretos.ReleaseTag),
-        # unsupported domain should return None
-        ("https://gitlab.com/owner/repo/issues/1", None),
-        # unsupported resource path should return None (e.g. tree is not implemented)
-        ("https://github.com/owner/repo/tree/main", None),
-    ],
+REF = st.text(string.ascii_letters + string.digits + "-._/", min_size=1).filter(
+    lambda s: not s.endswith(("/", "."))
+    and not s.startswith(("/", "."))
+    and ".." not in s
+    and "//" not in s
 )
-def test_parse_github_url_various(
-    url: str, expected_type: type[ghretos.GitHubResource] | None
-) -> None:
-    resource = ghretos.parse_url(url)
-    if expected_type is None:
-        assert resource is None
-    else:
-        assert isinstance(resource, expected_type)
+COMMENT_ID = st.integers(min_value=1)
 
 
 # Test cases for _parse_strict_url and _parse_unstrict_url
@@ -547,28 +515,6 @@ class TestParseNumberableUrl:
 
         assert result is None
 
-    def test_commits_page_converts_to_pull_type(self) -> None:
-        """Test that /issues/123/commits redirects to pull request type (strict type disabled)."""
-        # When require_strict_type=False, /issues/123/commits can be treated as pull request
-        settings = ghretos.MatcherSettings(require_strict_type=False)
-        url = "https://github.com/owner/repo/issues/123/commits/abc123#r456"
-        parsed_url = yarl.URL(url)
-
-        result = parse_unstrict_url(parsed_url, settings=settings)
-
-        assert isinstance(result, ghretos.PullRequestReviewComment)
-
-    def test_files_page_converts_to_pull_type(self) -> None:
-        """Test that /issues/123/files redirects to pull request type (strict type disabled)."""
-        # When require_strict_type=False, /issues/123/files can be treated as pull request
-        settings = ghretos.MatcherSettings(require_strict_type=False)
-        url = "https://github.com/owner/repo/issues/123/files#r456"
-        parsed_url = yarl.URL(url)
-
-        result = parse_unstrict_url(parsed_url, settings=settings)
-
-        assert isinstance(result, ghretos.PullRequestReviewComment)
-
     # --- Settings Tests ---
     def test_disabled_issues(self) -> None:
         """Test that issues are not parsed when disabled in settings."""
@@ -641,7 +587,7 @@ class TestParseNumberableUrl:
         assert result is None
 
 
-class TestParseUnstrictUrl:
+class TestLooseNumberableUrl:
     """Test suite for the _parse_unstrict_url function with require_strict_type=False."""
 
     @pytest.fixture
@@ -662,22 +608,6 @@ class TestParseUnstrictUrl:
         self, url: str, expected_type: type, unstrict_settings: ghretos.MatcherSettings
     ) -> None:
         """Test parsing basic numberable resources without fragments."""
-        parsed_url = yarl.URL(url)
-        result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
-        assert isinstance(result, expected_type)
-
-    # --- User and Repo ---
-    @pytest.mark.parametrize(
-        ("url", "expected_type"),
-        [
-            ("https://github.com/owner", ghretos.User),
-            ("https://github.com/owner/repo", ghretos.Repo),
-        ],
-    )
-    def test_user_and_repo(
-        self, url: str, expected_type: type, unstrict_settings: ghretos.MatcherSettings
-    ) -> None:
-        """Test parsing user and repo URLs."""
         parsed_url = yarl.URL(url)
         result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
         assert isinstance(result, expected_type)
@@ -753,23 +683,16 @@ class TestParseUnstrictUrl:
         result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
         assert isinstance(result, expected_type)
 
-    # --- Commits and Files Pages with /issues/ URLs ---
+    # --- Commits and Files Pages on Pull Requests ---
     @pytest.mark.parametrize(
         ("url", "expected_sha", "expected_commit_page", "expected_files_page"),
         [
-            (
-                "https://github.com/owner/repo/issues/123/commits/abc123#r456",
-                "abc123",
-                True,
-                False,
-            ),
             (
                 "https://github.com/owner/repo/pull/123/commits/def456#r789",
                 "def456",
                 True,
                 False,
             ),
-            ("https://github.com/owner/repo/issues/123/files#r456", None, False, True),
             ("https://github.com/owner/repo/pull/123/files#r789", None, False, True),
         ],
     )
@@ -848,68 +771,61 @@ class TestParseUnstrictUrl:
 
         assert result is None
 
-    # --- Cross-Type Fragment Support ---
-    def test_issue_fragment_on_pull_url(self, unstrict_settings: ghretos.MatcherSettings) -> None:
-        """Test that #issue- fragment on /pull/ URL returns PullRequest."""
-        url = "https://github.com/owner/repo/pull/123#issue-123"
+    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
+    @given(number=st.integers(min_value=1), fragment_number=st.integers(min_value=1))
+    @pytest.mark.parametrize("resource_type", ["issues", "pull", "discussions"])
+    @pytest.mark.parametrize(
+        ("fragment_front", "expected_callable"),
+        [
+            (
+                "issue-",
+                lambda resource_type: ghretos.Issue  # pyright: ignore[reportUnknownLambdaType]
+                if resource_type != "pull"
+                else ghretos.PullRequest,
+            ),
+            ("discussion-", lambda _: ghretos.Discussion),  # pyright: ignore[reportUnknownLambdaType]
+            ("pullrequestreview-", lambda _: ghretos.PullRequestReview),  # pyright: ignore[reportUnknownLambdaType]
+            ("discussion_r", lambda _: ghretos.PullRequestReviewComment),  # pyright: ignore[reportUnknownLambdaType]
+            (
+                "issuecomment-",
+                lambda resource_type: ghretos.IssueComment  # pyright: ignore[reportUnknownLambdaType]
+                if resource_type != "pull"
+                else ghretos.PullRequestComment,
+            ),
+            ("discussioncomment-", lambda _: ghretos.DiscussionComment),  # pyright: ignore[reportUnknownLambdaType]
+        ],  # type: ignore
+    )
+    def test_fragment_priority(
+        self,
+        resource_type: str,
+        number: str,
+        fragment_front: str,
+        fragment_number: int,
+        expected_callable: Callable[[str], type[ghretos.GitHubResource]],
+        unstrict_settings: ghretos.MatcherSettings,
+    ) -> None:
+        """Test that fragments take priority over the main resource type."""
+        url = f"https://github.com/owner/repo/{resource_type}/{number}#{fragment_front}{fragment_number}"
         parsed_url = yarl.URL(url)
-
         result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
+        expected_type = expected_callable(resource_type)
+        assert isinstance(result, expected_type)
 
-        assert isinstance(result, ghretos.PullRequest)
-        assert result.number == 123
-
-    def test_discussion_fragment_on_issue_url(
-        self, unstrict_settings: ghretos.MatcherSettings
-    ) -> None:
-        """Test that #discussion- fragment on /issues/ URL returns Discussion."""
-        url = "https://github.com/owner/repo/issues/456#discussion-456"
-        parsed_url = yarl.URL(url)
-
-        result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
-
-        assert isinstance(result, ghretos.Discussion)
-        assert result.number == 456
-
-    # --- Edge Cases ---
-    def test_multiple_resource_types_with_same_number(
-        self, unstrict_settings: ghretos.MatcherSettings
-    ) -> None:
-        """Test that different URL patterns for same number return appropriate types."""
-        number = 42
-
-        # Issue
-        url_issue = f"https://github.com/owner/repo/issues/{number}"
-        result_issue = parse_unstrict_url(yarl.URL(url_issue), settings=unstrict_settings)
-        assert isinstance(result_issue, ghretos.Issue)
-        assert result_issue.number == number
-
-        # Pull Request
-        url_pr = f"https://github.com/owner/repo/pull/{number}"
-        result_pr = parse_unstrict_url(yarl.URL(url_pr), settings=unstrict_settings)
-        assert isinstance(result_pr, ghretos.PullRequest)
-        assert result_pr.number == number
-
-        # Discussion
-        url_disc = f"https://github.com/owner/repo/discussions/{number}"
-        result_disc = parse_unstrict_url(yarl.URL(url_disc), settings=unstrict_settings)
-        assert isinstance(result_disc, ghretos.Discussion)
-        assert result_disc.number == number
-
-    def test_fallback_to_none_for_unsupported_patterns(
-        self, unstrict_settings: ghretos.MatcherSettings
-    ) -> None:
-        """Test that unsupported URL patterns return None."""
-        unsupported_urls = [
+    @pytest.mark.parametrize(
+        "url",
+        [
             "https://github.com/owner/repo/tree/main",
             "https://github.com/owner/repo/blob/main/file.py",
             "https://github.com/owner/repo/wiki",
             "https://github.com/owner/repo/issues/123/something/invalid",
-        ]
-
-        for url in unsupported_urls:
-            result = parse_unstrict_url(yarl.URL(url), settings=unstrict_settings)
-            assert result is None, f"Expected None for {url}"
+        ],
+    )
+    def test_fallback_to_none_for_unsupported_patterns(
+        self, url: str, unstrict_settings: ghretos.MatcherSettings
+    ) -> None:
+        """Test that unsupported URL patterns return None."""
+        result = parse_unstrict_url(yarl.URL(url), settings=unstrict_settings)
+        assert result is None
 
     # --- Issue and Discussion Comments ---
     @pytest.mark.parametrize(
@@ -963,6 +879,227 @@ class TestParseUnstrictUrl:
         assert isinstance(result, expected_type)
         assert result.comment_id == expected_comment_id
 
+    @pytest.mark.parametrize("number", ["hi", "234h", "!!", "0x3", "3f"])
+    @pytest.mark.parametrize(
+        "fragment",
+        ["issuecomment-", "discussioncomment-", "pullrequestreview-", "discussion_r", "event-"],
+    )
+    @pytest.mark.parametrize("resource_type", ["issues", "pull", "discussions"])
+    @pytest.mark.parametrize(
+        ("owner", "repo"),
+        [
+            ("owner", "repo"),
+            ("hi", "bob"),
+        ],
+    )
+    def test_invalid_resource_id(
+        self,
+        owner: str,
+        repo: str,
+        resource_type: str,
+        number: str,
+        fragment: str,
+        unstrict_settings: ghretos.MatcherSettings,
+    ) -> None:
+        """Test that invalid resource IDs return None."""
+        url = f"https://github.com/{owner}/{repo}/{resource_type}/{number}"
+        parsed_url = yarl.URL(url)
+        result = parse_unstrict_url(parsed_url, settings=unstrict_settings)
+        assert result is None
+
+
+class TestParseUrl:
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "h",
+            "https://notgithub.com/owner/repo/issues/1",
+            "http://example.com/../owner/repo",
+            "https://api.github.com/owner/repo",
+            "/../owner/repo",
+            "../owner/repo",
+            yarl.URL("/"),
+        ],
+    )
+    def test_parse_github_url_empty(self, url: str | yarl.URL) -> None:
+        resource = ghretos.parse_url(url)
+        assert resource is None
+
+    @given(owner=USER)
+    def test_parse_github_url_user(
+        self,
+        owner: str,
+    ) -> None:
+        url = f"https://github.com/{owner}"
+        original = parsing._valid_user  # pyright: ignore[reportPrivateUsage]
+        with unittest.mock.patch.object(
+            parsing, "_valid_user", unittest.mock.Mock(side_effect=original)
+        ) as mock:
+            resource = ghretos.parse_url(url)
+            mock.assert_called_once_with(owner)
+        assert isinstance(resource, ghretos.User)
+
+    @given(repo=REPO_NAME)
+    @pytest.mark.parametrize("owner", ["github", "octocat", "0x", "0"])
+    def test_parse_github_url_repo(
+        self,
+        owner: str,
+        repo: str,
+    ) -> None:
+        url = f"https://github.com/{owner}/{repo}"
+        resource = ghretos.parse_url(url)
+        original_user = parsing._valid_user  # pyright: ignore[reportPrivateUsage]
+        original_repo = parsing._valid_repository  # pyright: ignore[reportPrivateUsage]
+        with (
+            unittest.mock.patch.object(
+                parsing, "_valid_user", unittest.mock.Mock(side_effect=original_user)
+            ) as user_mock,
+            unittest.mock.patch.object(
+                parsing, "_valid_repository", unittest.mock.Mock(side_effect=original_repo)
+            ) as repo_mock,
+        ):
+            resource = ghretos.parse_url(url)
+            user_mock.assert_called_once_with(owner)
+            repo_mock.assert_called_once_with(repo)
+        assert isinstance(resource, ghretos.Repo)
+
+    @given(owner=USER, repo=REPO_NAME, number=NUMBERABLE)
+    @pytest.mark.parametrize(
+        ("resource_type", "expected_type"),
+        [
+            ("issues", ghretos.Issue),
+            ("pull", ghretos.PullRequest),
+            ("discussions", ghretos.Discussion),
+        ],
+    )
+    def test_parse_github_url_numberables(
+        self,
+        owner: str,
+        repo: str,
+        number: int,
+        resource_type: str,
+        expected_type: type[ghretos.GitHubResource],
+    ) -> None:
+        url = f"https://github.com/{owner}/{repo}/{resource_type}/{number}"
+        resource = ghretos.parse_url(url)
+        assert isinstance(resource, expected_type)
+
+    @given(owner=USER, repo=REPO_NAME, number=NUMBERABLE, fragment_id=COMMENT_ID)
+    @pytest.mark.parametrize("resource_type", ["issues", "pull", "discussions"])
+    @pytest.mark.parametrize(
+        ("fragment_front", "expected_callable"),
+        [
+            (
+                "issue-",
+                lambda resource_type: ghretos.Issue
+                if resource_type != "pull"
+                else ghretos.PullRequest,  # pyright: ignore[reportUnknownLambdaType]
+            ),
+            ("discussion-", lambda _: ghretos.Discussion),  # pyright: ignore[reportUnknownLambdaType]
+            ("pullrequestreview-", lambda _: ghretos.PullRequestReview),  # pyright: ignore[reportUnknownLambdaType]
+            ("discussion_r", lambda _: ghretos.PullRequestReviewComment),  # pyright: ignore[reportUnknownLambdaType]
+            (
+                "issuecomment-",
+                lambda resource_type: ghretos.IssueComment  # pyright: ignore[reportUnknownLambdaType]
+                if resource_type != "pull"
+                else ghretos.PullRequestComment,
+            ),
+            ("discussioncomment-", lambda _: ghretos.DiscussionComment),  # pyright: ignore[reportUnknownLambdaType]
+            pytest.param(
+                "event-",
+                lambda resource_type: ghretos.IssueEvent
+                if resource_type != "pull"
+                else ghretos.PullRequestEvent,
+                marks=pytest.mark.xfail(reason="event parsing is not implemented yet"),
+            ),
+            pytest.param(
+                "issue-asdfj", lambda _: None, marks=pytest.mark.skip("Not implemented yet")
+            ),  # pyright: ignore[reportUnknownLambdaType]
+            ("unfetteredcomment-", lambda _: None),  # pyright: ignore[reportUnknownLambdaType]
+        ],  # type: ignore
+    )
+    def test_parse_github_url_fragments(
+        self,
+        owner: str,
+        repo: str,
+        number: int,
+        resource_type: str,
+        fragment_front: str,
+        fragment_id: int,
+        expected_callable: Callable[[str], type[ghretos.GitHubResource] | None],
+    ) -> None:
+        settings = ghretos.MatcherSettings(require_strict_type=False)
+        url = f"https://github.com/{owner}/{repo}/{resource_type}/{number}#{fragment_front}{fragment_id}"
+        resource = ghretos.parse_url(url, settings=settings)
+        expected_model = expected_callable(resource_type)
+        if expected_model is None:
+            assert resource is None
+        else:
+            assert isinstance(resource, expected_model)
+
+    @given(
+        owner=USER,
+        repo=REPO_NAME,
+        number=st.text(),
+        fragment_id=st.text().filter(lambda s: all(c not in string.digits for c in s)),
+    )
+    @pytest.mark.parametrize("resource_type", ["issues", "pull", "discussions"])
+    @pytest.mark.parametrize(
+        ("fragment_front"),
+        [
+            "pullrequestreview-",
+            "discussion_r",
+            "issuecomment-",
+            "discussioncomment-",
+            "event-",
+        ],
+    )
+    def test_parse_github_url_fragment_non_number(
+        self,
+        owner: str,
+        repo: str,
+        number: int,
+        resource_type: str,
+        fragment_front: str,
+        fragment_id: str,
+    ) -> None:
+        settings = ghretos.MatcherSettings(require_strict_type=False)
+        url = f"https://github.com/{owner}/{repo}/{resource_type}/{number}#{fragment_front}{fragment_id}"
+        resource = ghretos.parse_url(url, settings=settings)
+        assert resource is None
+
+    @given(
+        owner=USER,
+        repo=REPO_NAME,
+        numberable=NUMBERABLE,
+        fragment_value=st.text().filter(lambda s: all(c not in string.digits for c in s)),
+    )
+    @pytest.mark.parametrize("resource_type", ["issues", "pull", "discussions"])
+    @pytest.mark.parametrize(
+        "fragment",
+        [
+            "issuecomment-",
+            "pullrequestreview-",
+            "discussioncomment-",
+            "discussion_r",
+            "r",
+            "whatever",
+        ],
+    )
+    def test_invalid_fragments(
+        self,
+        owner: str,
+        repo: str,
+        numberable: int,
+        resource_type: str,
+        fragment: str,
+        fragment_value: str,
+    ) -> None:
+        """Test that invalid fragments return None."""
+        url = f"https://github.com/{owner}/{repo}/{resource_type}/{numberable}#{fragment}{fragment_value}"
+        result = ghretos.parse_url(url)
+        assert result is None
+
 
 class TestShorthand:
     @given(owner=USER, repo_name=REPO_NAME, number=NUMBERABLE)
@@ -984,3 +1121,65 @@ class TestShorthand:
         assert isinstance(result, ghretos.Ref)
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.ref == ref
+
+    @given(owner=USER, repo_name=REPO_NAME)
+    def test_shorthand_repo(self, owner: str, repo_name: str) -> None:
+        """Test parsing shorthand repo notation."""
+        shorthand = f"{owner}/{repo_name}"
+        result = ghretos.parse_shorthand(shorthand)
+
+        assert isinstance(result, ghretos.Repo)
+        assert result.name == repo_name
+        assert result.owner == owner
+
+    @pytest.mark.parametrize(
+        "shorthand",
+        [
+            "ownerrepo#123",
+            "ownerrepo#",
+            "owner/repo#",
+            "owner/repo@",
+            "owner/repo#abc",
+            "justastring",
+        ],
+    )
+    def test_invalid_shorthand(self, shorthand: str) -> None:
+        """Test invalid shorthand notations return None."""
+        result = ghretos.parse_shorthand(shorthand)
+        assert result is None
+
+    @given(
+        owner=USER,
+        repo=REPO_NAME,
+        number=st.one_of(
+            st.text(min_size=1).filter(lambda s: all(c not in string.digits for c in s)),
+            st.just(""),
+            st.just("@"),
+            st.just("0"),
+        ),
+    )
+    def test_invalid_numberable(self, owner: str, repo: str, number: str) -> None:
+        """Test invalid numberable shorthand return None."""
+        shorthand = f"{owner}/{repo}#{number}"
+        result = ghretos.parse_shorthand(shorthand)
+        assert result is None
+
+    @given(
+        ref=st.one_of(
+            st.just(""),
+            st.text(min_size=1).filter(lambda x: " " in x),
+            *[st.just(x) for x in ["~", "^", "?", "..", ":", "//", "\\"]],
+            st.just("@"),
+            st.just("fix/hi./test"),
+            st.just("fix/h i/test"),
+            st.just("fix//double"),
+            st.just("fix/tests.lock"),
+            st.just("fix/rip.lock/testing"),
+            st.just("fix/.keep/testing"),
+            st.just(".lock"),
+        ),
+    )
+    def test_invalid_ref(self, ref: str) -> None:
+        """Test invalid ref return None."""
+        result = validate_ref(ref)
+        assert result is False

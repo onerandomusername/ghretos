@@ -352,4 +352,5 @@ class MatcherSettings:
             short_repo=False,
             short_numberables=False,
             short_refs=False,
+            require_strict_type=False,
         )
