@@ -550,7 +550,7 @@ def parse_shorthand(
         return None
     # Iterate once.
     user: str = ""
-    repo: str = ""
+    repo_name: str = ""
     ref_type: str = ""
 
     if "/" in shorthand:
@@ -561,21 +561,25 @@ def parse_shorthand(
         user = default_user
 
     # validate the user
-    for char in user:
-        if char not in string.ascii_letters + string.digits + "-._":
-            return None
+    if not _valid_user(user):
+        return None
 
+    was_broken = True
     for char in shorthand:
         if char in ("#", "@"):
             ref_type = char
             break
-        if char not in string.ascii_letters + string.digits + "-._":
-            return None
-        repo += char
+        repo_name += char
     else:
-        return models.Repo(name=repo, owner=user) if settings.short_repo else None
+        was_broken = False
+    if not _valid_repository(repo_name):
+        return None
 
-    ref = shorthand[len(repo) + 1 :]
+    repo = models.Repo(name=repo_name, owner=user)
+    if not was_broken:
+        return repo if settings.short_repo else None
+
+    ref = shorthand[len(repo_name) + 1 :]
     if ref_type == "#":
         try:
             number = int(ref)
@@ -584,7 +588,7 @@ def parse_shorthand(
         if number < 1:
             return None
         return (
-            models.NumberedResource(repo=models.Repo(name=repo, owner=user), number=number)
+            models.NumberedResource(repo=repo, number=number)
             if settings.short_numberables
             else None
         )
@@ -592,9 +596,5 @@ def parse_shorthand(
         # Check the type of ref matches allowed patterns
         if not _validate_ref(ref):
             return None
-        return (
-            models.Ref(repo=models.Repo(name=repo, owner=user), ref=ref)
-            if settings.short_refs
-            else None
-        )
+        return models.Ref(repo=repo, ref=ref) if settings.short_refs else None
     return None
