@@ -27,6 +27,7 @@ Pull Requests support reviews and review comments:
 """  # noqa: E501
 
 import string
+from typing import Literal, overload
 
 import yarl
 
@@ -100,6 +101,9 @@ def _valid_repository(repository: str) -> bool:
         return False
     allowed_chars = string.ascii_letters + string.digits + "-._"
 
+    if repository.endswith(".git"):
+        return False
+
     for char in repository:  # noqa: SIM110
         if char not in allowed_chars:
             return False
@@ -138,11 +142,35 @@ def _validate_ref(ref: str) -> bool:
     return True
 
 
-def _get_id_from_fragment(url: yarl.URL, prefix: str) -> str | None:
-    fragment = url.fragment
-    if fragment.startswith(prefix):
-        return fragment[len(prefix) :]
-    return None
+@overload
+def _get_id_from_fragment(
+    url: yarl.URL | str, prefix: str, *, require_int: Literal[False]
+) -> str | None: ...
+@overload
+def _get_id_from_fragment(
+    url: yarl.URL | str, prefix: str, *, require_int: Literal[True] = True
+) -> int | None: ...
+def _get_id_from_fragment(
+    url: yarl.URL | str, prefix: str, *, require_int: bool = True
+) -> str | int | None:
+    if isinstance(url, yarl.URL):
+        fragment = url.fragment
+    else:
+        fragment = url.removeprefix("#")
+    if not fragment.startswith(prefix):
+        return None
+    fragment = fragment.removeprefix(prefix)
+
+    if require_int:
+        # be strict about it
+        if not fragment.isdigit() or not fragment.isascii():
+            return None
+        try:
+            return int(fragment)
+        except ValueError:
+            return None
+
+    return fragment
 
 
 def _parse_strict_numberable_url(
@@ -167,38 +195,35 @@ def _parse_strict_numberable_url(
             return None
     if not _valid_user(owner) or not _valid_repository(repository):
         return None
-    try:
-        resource_id = int(resource_id)
-    except ValueError:
+    if not resource_id.isdigit() or not resource_id.isascii():
         return None
+    resource_id = int(resource_id)
     repo = models.Repo(name=repository, owner=owner)
     # inject the resource_type for strict matching
     rest.insert(0, resource_type)
     match rest:
         case ["issues"] if settings.issues:
             return models.Issue(repo=repo, number=resource_id)
-        case ["issues", fragment] if settings.issues and fragment.startswith("#issue-"):
+        case ["issues", fragment] if settings.issues and _get_id_from_fragment(fragment, "issue-"):
             return models.Issue(repo=repo, number=resource_id)
         case ["pull"] if settings.pull_requests:
             return models.PullRequest(repo=repo, number=resource_id)
-        case ["pull", fragment] if settings.pull_requests and fragment.startswith("#issue-"):
+        case ["pull", fragment] if settings.pull_requests and _get_id_from_fragment(
+            fragment, "issue-"
+        ):
             return models.PullRequest(repo=repo, number=resource_id)
         case ["discussions"] if settings.discussions:
             return models.Discussion(repo=repo, number=resource_id)
-        case ["discussions", fragment] if settings.discussions and fragment.startswith(
-            "#discussion-"
+        case ["discussions", fragment] if settings.discussions and _get_id_from_fragment(
+            fragment, "discussion-"
         ):
             return models.Discussion(repo=repo, number=resource_id)
         case ["pull", "commits", sha, fragment] if settings.pull_request_review_comments and (
-            fragment := _get_id_from_fragment(parsed_url, "r")
+            comment_id := _get_id_from_fragment(fragment, "r")
         ):
             # Validate SHA is hexadecimal
             try:
                 int(sha, 16)
-            except ValueError:
-                return None
-            try:
-                comment_id = int(fragment)
             except ValueError:
                 return None
             return models.PullRequestReviewComment(
@@ -210,12 +235,8 @@ def _parse_strict_numberable_url(
             "files",
             fragment,
         ] if settings.pull_request_review_comments and (
-            fragment := _get_id_from_fragment(parsed_url, "r")
+            comment_id := _get_id_from_fragment(fragment, "r")
         ):
-            try:
-                comment_id = int(fragment)
-            except ValueError:
-                return None
             return models.PullRequestReviewComment(
                 repo=repo,
                 number=resource_id,
@@ -224,79 +245,50 @@ def _parse_strict_numberable_url(
                 files_page=True,
             )
         # Issue with #issue- fragment
-        case ["issues", fragment] if settings.issues and fragment.startswith("#issue-"):
+        case ["issues", fragment] if settings.issues and _get_id_from_fragment(
+            parsed_url, "issue-"
+        ):
             return models.Issue(repo=repo, number=resource_id)
         # Issue comments
-        case ["issues", fragment] if settings.issue_comments and fragment.startswith(
-            "#issuecomment-"
+        case ["issues", fragment] if settings.issue_comments and (
+            comment_id := _get_id_from_fragment(fragment, "issuecomment-")
         ):
-            comment_id = fragment[len("#issuecomment-") :]
-            try:
-                comment_id = int(comment_id)
-            except ValueError:
-                return None
             return models.IssueComment(repo=repo, number=resource_id, comment_id=comment_id)
         # Pull request comments
-        case ["pull", fragment] if settings.pull_request_comments and fragment.startswith(
-            "#issuecomment-"
+        case ["pull", fragment] if settings.pull_request_comments and (
+            comment_id := _get_id_from_fragment(fragment, "issuecomment-")
         ):
-            comment_id = fragment[len("#issuecomment-") :]
-            try:
-                comment_id = int(comment_id)
-            except ValueError:
-                return None
             return models.PullRequestComment(repo=repo, number=resource_id, comment_id=comment_id)
         # Issue events
-        case ["issues", fragment] if settings.issue_events and fragment.startswith("#event-"):
-            event_id = fragment[len("#event-") :]
-            try:
-                event_id = int(event_id)
-            except ValueError:
-                return None
+        case ["issues", fragment] if settings.issue_events and (
+            event_id := _get_id_from_fragment(fragment, "event-")
+        ):
             return models.IssueEvent(repo=repo, number=resource_id, event_id=event_id)
         # Pull request events
-        case ["pull", fragment] if settings.pull_request_events and fragment.startswith("#event-"):
-            event_id = fragment[len("#event-") :]
-            try:
-                event_id = int(event_id)
-            except ValueError:
-                return None
+        case ["pull", fragment] if settings.pull_request_events and (
+            event_id := _get_id_from_fragment(fragment, "event-")
+        ):
             return models.PullRequestEvent(
                 repo=repo,
                 number=resource_id,
                 event_id=event_id,
             )
         # Pull request reviews
-        case ["pull", fragment] if settings.pull_request_reviews and fragment.startswith(
-            "#pullrequestreview-"
+        case ["pull", fragment] if settings.pull_request_reviews and (
+            review_id := _get_id_from_fragment(fragment, "pullrequestreview-")
         ):
-            review_id = fragment[len("#pullrequestreview-") :]
-            try:
-                review_id = int(review_id)
-            except ValueError:
-                return None
             return models.PullRequestReview(repo=repo, number=resource_id, review_id=review_id)
         # Pull request review comments (discussion_r)
-        case ["pull", fragment] if settings.pull_request_review_comments and fragment.startswith(
-            "#discussion_r"
+        case ["pull", fragment] if settings.pull_request_review_comments and (
+            comment_id := _get_id_from_fragment(fragment, "discussion_r")
         ):
-            comment_id = fragment[len("#discussion_r") :]
-            try:
-                comment_id = int(comment_id)
-            except ValueError:
-                return None
             return models.PullRequestReviewComment(
                 repo=repo, number=resource_id, comment_id=comment_id
             )
         # Discussion comments
-        case ["discussions", fragment] if settings.discussion_comments and fragment.startswith(
-            "#discussioncomment-"
+        case ["discussions", fragment] if settings.discussion_comments and (
+            comment_id := _get_id_from_fragment(fragment, "discussioncomment-")
         ):
-            comment_id = fragment[len("#discussioncomment-") :]
-            try:
-                comment_id = int(comment_id)
-            except ValueError:
-                return None
             return models.DiscussionComment(repo=repo, number=resource_id, comment_id=comment_id)
         case _:
             return None
@@ -323,10 +315,9 @@ def _parse_loose_numberable_url(
             return None
     if not _valid_user(owner) or not _valid_repository(repository_name):
         return None
-    try:
-        resource_id = int(resource_id)
-    except ValueError:
+    if not resource_id.isdigit() or not resource_id.isascii():
         return None
+    resource_id = int(resource_id)
     repo = models.Repo(name=repository_name, owner=owner)
     # inject the resource_type for loose matching
     match rest:
@@ -340,13 +331,8 @@ def _parse_loose_numberable_url(
             elif resource_type == "discussions" and settings.discussions:
                 return models.Discussion(repo=repo, number=resource_id)
             return None
-        case [fragment] if fragment.startswith("#issuecomment-"):
-            comment_id = fragment[len("#issuecomment-") :]
-            try:
-                comment_id = int(comment_id)
-            except ValueError:
-                return None
-            if resource_type == "pull":
+        case [fragment] if comment_id := _get_id_from_fragment(fragment, "issuecomment-"):
+            if resource_type == "pull" and settings.pull_request_comments:
                 return (
                     models.PullRequestComment(repo=repo, number=resource_id, comment_id=comment_id)
                     if settings.pull_request_comments
@@ -357,55 +343,36 @@ def _parse_loose_numberable_url(
                 if settings.issue_comments
                 else None
             )
-        case [fragment] if settings.discussion_comments and fragment.startswith(
-            "#discussioncomment-"
+        case [fragment] if settings.discussion_comments and (
+            comment_id := _get_id_from_fragment(fragment, "discussioncomment-")
         ):
-            comment_id = fragment[len("#discussioncomment-") :]
-            try:
-                comment_id = int(comment_id)
-            except ValueError:
-                return None
             return models.DiscussionComment(repo=repo, number=resource_id, comment_id=comment_id)
-        case [fragment] if fragment.startswith(("#issue-", "#discussion-")):
-            if fragment.startswith("#issue-"):
-                if resource_type == "pull":
-                    return (
-                        models.PullRequest(repo=repo, number=resource_id)
-                        if settings.pull_requests
-                        else None
-                    )
-                return models.Issue(repo=repo, number=resource_id) if settings.issues else None
-            elif fragment.startswith("#discussion-"):
+        case [fragment] if _get_id_from_fragment(fragment, "issue-"):
+            if resource_type == "pull":
                 return (
-                    models.Discussion(repo=repo, number=resource_id)
-                    if settings.discussions
+                    models.PullRequest(repo=repo, number=resource_id)
+                    if settings.pull_requests
                     else None
                 )
-            return None
+            return models.Issue(repo=repo, number=resource_id) if settings.issues else None
+        case [fragment] if _get_id_from_fragment(fragment, "discussion-"):
+            return (
+                models.Discussion(repo=repo, number=resource_id) if settings.discussions else None
+            )
         case [fragment] if settings.pull_request_review_comments and (
-            fragment.startswith(("#pullrequestreview-", "#discussion_r"))
+            review_id := _get_id_from_fragment(fragment, "pullrequestreview-")
         ):
-            if fragment.startswith("#pullrequestreview-"):
-                review_id = fragment.removeprefix("#pullrequestreview-")
-                try:
-                    review_id = int(review_id)
-                except ValueError:
-                    return None
-                return models.PullRequestReview(repo=repo, number=resource_id, review_id=review_id)
-            elif fragment.startswith("#discussion_r"):
-                comment_id = fragment.removeprefix("#discussion_r")
-                try:
-                    comment_id = int(comment_id)
-                except ValueError:
-                    return None
-                return models.PullRequestReviewComment(
-                    repo=repo, number=resource_id, comment_id=comment_id
-                )
-            return None
+            return models.PullRequestReview(repo=repo, number=resource_id, review_id=review_id)
+        case [fragment] if settings.pull_request_review_comments and (
+            comment_id := _get_id_from_fragment(fragment, "discussion_r")
+        ):
+            return models.PullRequestReviewComment(
+                repo=repo, number=resource_id, comment_id=comment_id
+            )
         case ["commits", sha, fragment] if (
             settings.pull_request_review_comments
             and resource_type == "pull"
-            and (fragment := _get_id_from_fragment(parsed_url, "r"))
+            and (comment_id := _get_id_from_fragment(parsed_url, "r"))
         ):
             # Validate SHA is hexadecimal
             try:
@@ -415,7 +382,7 @@ def _parse_loose_numberable_url(
             return models.PullRequestReviewComment(
                 repo=repo,
                 number=resource_id,
-                comment_id=int(fragment),
+                comment_id=comment_id,
                 sha=sha,
                 commit_page=True,
             )
@@ -423,12 +390,12 @@ def _parse_loose_numberable_url(
         case ["files", fragment] if (
             settings.pull_request_review_comments
             and resource_type == "pull"
-            and (fragment := _get_id_from_fragment(parsed_url, "r"))
+            and (comment_id := _get_id_from_fragment(parsed_url, "r"))
         ):
             return models.PullRequestReviewComment(
                 repo=repo,
                 number=resource_id,
-                comment_id=int(fragment),
+                comment_id=comment_id,
                 commit_page=False,
                 files_page=True,
             )
@@ -492,27 +459,17 @@ def parse_url(
                     match rest:
                         case ["commit", sha] if settings.commits:
                             return models.Commit(repo=repo, sha=sha)
-                        case ["commit", sha, fragment] if (
-                            settings.commit_comments and fragment.startswith("#commitcomment-")
+                        case ["commit", sha, fragment] if settings.commit_comments and (
+                            comment_id := _get_id_from_fragment(parsed_url, "#commitcomment-")
                         ):
-                            comment_id = fragment[len("#commitcomment-") :]
-                            try:
-                                comment_id = int(comment_id)
-                            except ValueError:
-                                return None
                             return models.CommitComment(repo=repo, sha=sha, comment_id=comment_id)
                         case ["releases", "tag", tag] if settings.releases:
                             return models.ReleaseTag(repo=repo, tag=tag)
                         case ["commit", sha] if settings.commits:
                             return models.Commit(repo=repo, sha=sha)
-                        case ["commit", sha, fragment] if (
-                            settings.commit_comments and fragment.startswith("#commitcomment-")
+                        case ["commit", sha, fragment] if settings.commit_comments and (
+                            comment_id := _get_id_from_fragment(fragment, "#commitcomment-")
                         ):
-                            comment_id = fragment[len("#commitcomment-") :]
-                            try:
-                                comment_id = int(comment_id)
-                            except ValueError:
-                                return None
                             return models.CommitComment(repo=repo, sha=sha, comment_id=comment_id)
                         case ["releases", "tag", tag] if settings.releases:
                             return models.ReleaseTag(repo=repo, tag=tag)

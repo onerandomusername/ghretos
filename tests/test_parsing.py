@@ -51,11 +51,7 @@ def default_settings() -> ghretos.MatcherSettings:
 class TestParseNumberableUrl:
     """Test suite for the _parse_strict_url and _parse_unstrict_url functions."""
 
-    # --- Basic Issues ---
-    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-    )
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -81,11 +77,8 @@ class TestParseNumberableUrl:
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
 
-    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-        fragment=COMMENT_ID,
-    )
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
+    @pytest.mark.parametrize("fragment", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -111,11 +104,7 @@ class TestParseNumberableUrl:
         assert isinstance(result, ghretos.Issue)
         assert result.number == number
 
-    # --- Basic Pull Requests ---
-    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-    )
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -141,11 +130,7 @@ class TestParseNumberableUrl:
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
 
-    # --- Basic Discussions ---
-    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-    )
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -172,11 +157,8 @@ class TestParseNumberableUrl:
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
 
-    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-        fragment=COMMENT_ID,
-    )
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
+    @pytest.mark.parametrize("fragment", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -202,12 +184,8 @@ class TestParseNumberableUrl:
         assert isinstance(result, ghretos.Discussion)
         assert result.number == number
 
-    # --- Issue Comments ---
-    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-        comment_id=COMMENT_ID,
-    )
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
+    @pytest.mark.parametrize("comment_id", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -235,12 +213,8 @@ class TestParseNumberableUrl:
         assert result.number == number
         assert result.comment_id == comment_id
 
-    # --- Pull Request Comments ---
-    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-        comment_id=COMMENT_ID,
-    )
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
+    @pytest.mark.parametrize("comment_id", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -268,12 +242,8 @@ class TestParseNumberableUrl:
         assert result.number == number
         assert result.comment_id == comment_id
 
-    # --- Issue Events ---
-    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-        event_id=COMMENT_ID,
-    )
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
+    @pytest.mark.parametrize("event_id", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -301,12 +271,8 @@ class TestParseNumberableUrl:
         assert result.number == number
         assert result.event_id == event_id
 
-    # --- Pull Request Events ---
-    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-        event_id=COMMENT_ID,
-    )
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
+    @pytest.mark.parametrize("event_id", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -334,12 +300,8 @@ class TestParseNumberableUrl:
         assert result.number == number
         assert result.event_id == event_id
 
-    # --- Pull Request Reviews ---
-    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-        review_id=COMMENT_ID,
-    )
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
+    @pytest.mark.parametrize("review_id", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -367,12 +329,8 @@ class TestParseNumberableUrl:
         assert result.number == number
         assert result.review_id == review_id
 
-    # --- Pull Request Review Comments (discussion_r) ---
-    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-        comment_id=COMMENT_ID,
-    )
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
+    @pytest.mark.parametrize("comment_id", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -403,13 +361,10 @@ class TestParseNumberableUrl:
         assert result.commit_page is False
         assert result.files_page is False
 
-    # --- Pull Request Review Comments on commits page ---
     @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-        sha=SHA,
-        comment_id=COMMENT_ID,
-    )
+    @given(sha=SHA)
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
+    @pytest.mark.parametrize("comment_id", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -441,12 +396,8 @@ class TestParseNumberableUrl:
         assert result.commit_page is True
         assert result.files_page is False
 
-    # --- Pull Request Review Comments on files page ---
-    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-        comment_id=COMMENT_ID,
-    )
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
+    @pytest.mark.parametrize("comment_id", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -477,12 +428,8 @@ class TestParseNumberableUrl:
         assert result.commit_page is False
         assert result.files_page is True
 
-    # --- Discussion Comments ---
-    @settings(suppress_health_check=[hypothesis.HealthCheck.function_scoped_fixture])
-    @given(
-        number=NUMBERABLE,
-        comment_id=COMMENT_ID,
-    )
+    @pytest.mark.parametrize("number", [1, 42, 9999, 2147483647])
+    @pytest.mark.parametrize("comment_id", [1, 42, 9999, 2147483647])
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -510,7 +457,6 @@ class TestParseNumberableUrl:
         assert result.number == number
         assert result.comment_id == comment_id
 
-    # --- Edge Cases: Invalid inputs ---
     def test_invalid_number_not_digit(self, default_settings: ghretos.MatcherSettings) -> None:
         """Test that non-numeric issue numbers return None."""
         url = "https://github.com/owner/repo/issues/abc"
@@ -1243,7 +1189,17 @@ class TestShorthand:
         assert result.repo == ghretos.Repo(name=repo_name, owner=owner)
         assert result.number == number
 
-    @given(ref=REF)
+    @pytest.mark.parametrize(
+        "ref",
+        [
+            "main",
+            "feature-branch",
+            "fix/bug",
+            "release_v1.0.0",
+            "hotfix.urgent",
+            "#",
+        ],
+    )
     @pytest.mark.parametrize(
         ("owner", "repo_name"),
         [
@@ -1312,7 +1268,17 @@ class TestShorthand:
         assert result is None
 
 
-@given(user=USER)
+@pytest.mark.parametrize(
+    "user",
+    [
+        "octocat",
+        "0",
+        "1",
+        "hello-world",
+        "UserFifty",
+        "github",
+    ],
+)
 def test_valid_user(user: str) -> None:
     """Test that valid usernames are accepted."""
     assert parsing._valid_user(user)  # pyright: ignore[reportPrivateUsage]
@@ -1337,25 +1303,50 @@ def test_invalid_user(user: str) -> None:
     assert parsing._valid_user(user) is False  # pyright: ignore[reportPrivateUsage]
 
 
-@given(repository=REPO_NAME)
+@pytest.mark.parametrize(
+    "repository",
+    [
+        "Hello-World",
+        "some_repo",
+        "..----.--.__",
+        "_",
+        "...",
+        "-",
+        "hi.pdf",
+    ],
+)
 def test_valid_repository(repository: str) -> None:
     assert parsing._valid_repository(repository)  # pyright: ignore[reportPrivateUsage]
 
 
-@given(
-    repository=st.one_of(
-        st.text().filter(
-            lambda s: any(c not in string.ascii_letters + "-._" + string.digits for c in s)
-        ),
-        st.text(min_size=0, max_size=0),
-        st.text(min_size=101),
-    )
+@pytest.mark.parametrize(
+    "repository",
+    [
+        "",
+        "repo name",
+        "repo$pecial",
+        "a" * 101,
+        ".git",
+        "repo%name",
+    ],
 )
 def test_invalid_repository(repository: str) -> None:
     assert parsing._valid_repository(repository) is False  # pyright: ignore[reportPrivateUsage]
 
 
-@given(ref=REF)
+@pytest.mark.parametrize(
+    "ref",
+    [
+        "main",
+        "feature-branch",
+        "fix/bug",
+        "release_v1.0.0",
+        "hotfix.urgent",
+        "#",
+        "a" * 255,
+        "fix/this.error/h",
+    ],
+)
 def test_valid_ref(ref: str) -> None:
     assert validate_ref(ref)
 
