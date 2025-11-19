@@ -484,7 +484,7 @@ def parse_url(
 def parse_shorthand(
     shorthand: str,
     *,
-    default_user: str | None = None,
+    allow_optional_user: bool = False,
     settings: models.MatcherSettings = _DEFAULT_MATCHER_SETTINGS,
 ) -> models.GitHubResource | None:
     """
@@ -500,6 +500,9 @@ def parse_shorthand(
     - repo#issue_number
     - repo@ref (can be sha, branch, or tag)
 
+    When `allow_optional_user` is False, the user must be provided.
+    If allow_optional_user is True, returned repos will have an empty string in the User field.
+
     No requests are made to GitHub; this is purely syntactic parsing.
     No validation is performed on the parsed values, they are simply returned as-is.
     """
@@ -512,14 +515,14 @@ def parse_shorthand(
 
     if "/" in shorthand:
         user, shorthand = shorthand.split("/", 1)
-    elif default_user is None:
+        # validate the user
+        if not _valid_user(user):
+            return None
+
+    elif not allow_optional_user:
         return None
     else:
-        user = default_user
-
-    # validate the user
-    if not _valid_user(user):
-        return None
+        user = ""
 
     was_broken = True
     for char in shorthand:

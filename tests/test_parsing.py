@@ -1267,6 +1267,22 @@ class TestShorthand:
         result = ghretos.parse_shorthand(shorthand)
         assert result is None
 
+    def test_allow_optional_user(self) -> None:
+        """Test that allow_optional_user works."""
+        shorthand = "repo-name#123"
+        result = ghretos.parse_shorthand(shorthand, allow_optional_user=True)
+
+        assert isinstance(result, ghretos.NumberedResource)
+        assert result.repo == ghretos.Repo(name="repo-name", owner="")
+        assert result.number == 123
+
+    def test_require_user(self) -> None:
+        """Test that require_user works."""
+        shorthand = "repo-name#123"
+        result = ghretos.parse_shorthand(shorthand, allow_optional_user=False)
+
+        assert result is None
+
 
 @pytest.mark.parametrize(
     "user",
