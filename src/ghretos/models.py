@@ -325,6 +325,10 @@ class MatcherSettings:
     short_refs: bool = True
     """Whether to support shorthand notations such as ``owner/repo@ref``."""
 
+    short_bare_username: bool = False
+    """Whether to support bare short username notation. e.g., `username` to refer to a user.
+    This is disabled by default to prevent false positives."""
+
     require_strict_type: bool = True
     """Whether to support /issues/, /pulls/, and /discussions/ only for their respective types.
     If this is False, issues, pulls, and discussions will be ignored if the fragment indicates a

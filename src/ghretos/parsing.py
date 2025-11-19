@@ -513,6 +513,9 @@ def parse_shorthand(
     repo_name: str = ""
     ref_type: str = ""
 
+    if settings.short_bare_username and _valid_user(shorthand):
+        return models.User(login=shorthand)
+
     if "/" in shorthand:
         user, shorthand = shorthand.split("/", 1)
         # validate the user
