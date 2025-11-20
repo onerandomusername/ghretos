@@ -72,6 +72,7 @@ BLACKLISTED_USER_NAMES = frozenset(
         "newsroom",
         "why-github",
         "customer-stories",
+        "user-attachments",
     )
 )
 
