@@ -283,7 +283,7 @@ class MatcherSettings:
     For example, disabling `issues` will not disable `issue_comments`.
     """
 
-    domains: list[str] = dataclasses.field(default_factory=lambda: ["github.com"])
+    domains: list[str] = dataclasses.field(default_factory=lambda: ["github.com", "www.github.com"])
     """List of domains to consider as GitHub domains."""
     issues: bool = True
     """Whether to match ``/owner/repo/issues/{number}`` URLs."""
