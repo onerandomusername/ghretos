@@ -8,12 +8,12 @@ wheels/
 
 # Virtual environments
 .venv
+.python-version
 
 # Sphinx documentation artifacts
 docs/_build/
 
-# Coverage
+# Other generated files
 .coverage*
-
-# hypothesis
 .hypothesis/
+.ruff_cache/
