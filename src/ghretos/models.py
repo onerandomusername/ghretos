@@ -1,6 +1,6 @@
 import dataclasses
 import functools
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 
 __all__ = (
@@ -29,7 +29,13 @@ if TYPE_CHECKING:
 
 
 if TYPE_CHECKING:
-    dataclass_deco = dataclasses.dataclass
+    from typing_extensions import dataclass_transform
+
+    T = TypeVar("T")
+
+    @dataclass_transform(order_default=True, kw_only_default=True, frozen_default=True)
+    def dataclass_deco(cls: T) -> T:
+        return cls
 else:
     dataclass_deco = functools.partial(
         dataclasses.dataclass,
