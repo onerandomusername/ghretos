@@ -32,6 +32,7 @@ from typing import Literal, overload
 import yarl
 
 from ghretos import models
+from ghretos._reserved_usernames import RESERVED_USER_NAMES
 
 
 __all__ = (
@@ -41,40 +42,6 @@ __all__ = (
 
 
 _DEFAULT_MATCHER_SETTINGS = models.MatcherSettings()
-
-BLACKLISTED_USER_NAMES = frozenset(
-    (
-        "issues",
-        "pulls",
-        "orgs",
-        "search",
-        "pages",
-        "copilot",
-        "settings",
-        "login",
-        "home",
-        "newsletter",
-        "gist",
-        "codespaces",
-        "new",
-        "notifications",
-        "enterprise",
-        "features",
-        "pricing",
-        "security",
-        "account",
-        "organizations",
-        "edu",
-        "about",
-        "mobile",
-        "marketplace",
-        "mcp",
-        "newsroom",
-        "why-github",
-        "customer-stories",
-        "user-attachments",
-    )
-)
 
 
 def _valid_user(user: str) -> bool:
@@ -86,7 +53,7 @@ def _valid_user(user: str) -> bool:
     if user[0] == "-" or user[-1] == "-" or "--" in user:
         return False
 
-    if user.casefold() in BLACKLISTED_USER_NAMES:
+    if user.casefold() in RESERVED_USER_NAMES:
         return False
 
     for char in user:  # noqa: SIM110

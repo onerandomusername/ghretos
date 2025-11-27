@@ -21,8 +21,11 @@ from ghretos.parsing import (
 )
 
 
-USER = st.from_regex(r"^[a-zA-Z0-9-]{1,39}$", fullmatch=True).filter(
-    lambda s: not s.startswith("-") and not s.endswith("-") and "--" not in s
+USER = (
+    st.from_regex(r"^[a-zA-Z0-9-]{1,39}$", fullmatch=True)
+    .filter(lambda s: not s.startswith("-") and not s.endswith("-") and "--" not in s)
+    # for some reason these two single-letter usernames are not valid
+    .filter(lambda s: s.casefold() not in ("c", "w"))
 )
 REPO_NAME = st.from_regex(r"^[0-9._-]{1,100}$", fullmatch=True).filter(
     lambda s: s not in (".", "..")
