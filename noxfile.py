@@ -119,7 +119,7 @@ def lint(session: nox.Session) -> None:
 @nox.session(tags=("ci",))
 def pyright(session: nox.Session) -> None:
     """Run pyright."""
-    install_deps(session, groups=["tools"])
+    install_deps(session, groups=["docs", "test", "tools"])
     env = {
         "PYRIGHT_PYTHON_IGNORE_WARNINGS": "1",
     }
