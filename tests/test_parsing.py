@@ -1046,9 +1046,9 @@ class TestParseUrl:
         [
             (
                 "issue-",
-                lambda resource_type: ghretos.Issue
+                lambda resource_type: ghretos.Issue  # pyright: ignore[reportUnknownLambdaType]
                 if resource_type != "pull"
-                else ghretos.PullRequest,  # pyright: ignore[reportUnknownLambdaType]
+                else ghretos.PullRequest,
             ),
             ("discussion-", lambda _: ghretos.Discussion),  # pyright: ignore[reportUnknownLambdaType]
             ("pullrequestreview-", lambda _: ghretos.PullRequestReview),  # pyright: ignore[reportUnknownLambdaType]
@@ -1062,15 +1062,15 @@ class TestParseUrl:
             ("discussioncomment-", lambda _: ghretos.DiscussionComment),  # pyright: ignore[reportUnknownLambdaType]
             pytest.param(
                 "event-",
-                lambda resource_type: ghretos.IssueEvent  # pyright: ignore[reportUnknownArgumentType]
+                lambda resource_type: ghretos.IssueEvent  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
                 if resource_type != "pull"
                 else ghretos.PullRequestEvent,
                 marks=pytest.mark.xfail(reason="event parsing is not implemented yet"),
             ),
             pytest.param(
                 "issue-asdfj",
-                lambda _: None,
-                marks=pytest.mark.skip("Not implemented yet"),  # pyright: ignore[reportUnknownLambdaType]
+                lambda _: None,  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+                marks=pytest.mark.skip("Not implemented yet"),
             ),
             ("unfetteredcomment-", lambda _: None),  # pyright: ignore[reportUnknownLambdaType]
         ],  # type: ignore
