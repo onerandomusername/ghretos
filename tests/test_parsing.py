@@ -406,16 +406,18 @@ class TestParseNumberableUrl:
             ("user123", "repo.name"),
         ],
     )
+    @pytest.mark.parametrize("page_type", ["files", "changes"])
     def test_pull_request_review_comment_files_page(
         self,
         owner: str,
         repo_name: str,
         number: int,
         comment_id: int,
+        page_type: str,
         default_settings: ghretos.MatcherSettings,
     ) -> None:
         """Test parsing pull request review comments on files page."""
-        url = f"https://github.com/{owner}/{repo_name}/pull/{number}/files#r{comment_id}"
+        url = f"https://github.com/{owner}/{repo_name}/pull/{number}/{page_type}#r{comment_id}"
         parsed_url = yarl.URL(url)
 
         result = parse_strict_url(parsed_url, settings=default_settings)
@@ -726,6 +728,7 @@ class TestLooseNumberableUrl:
                 False,
             ),
             ("https://github.com/owner/repo/pull/123/files#r789", None, False, True),
+            ("https://github.com/owner/repo/pull/123/changes#r789", None, False, True),
         ],
     )
     def test_commits_and_files_pages(

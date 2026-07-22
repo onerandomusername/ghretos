@@ -181,7 +181,7 @@ class PullRequestReviewComment(_PullRequest):
 
     # these comments are special and can live on multiple pages:
     # pull/<num>/commits/<sha>#r<ID>
-    # pull/files#r<ID>
+    # pull/<num>/files#r<ID>  (or pull/<num>/changes#r<ID>)
     sha: str | None = None
     """The SHA of the commit the comment is on, if applicable."""
     commit_page: bool = False

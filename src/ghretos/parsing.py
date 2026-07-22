@@ -233,7 +233,7 @@ def _parse_strict_numberable_url(
         # Pull request review comments on /files page (no SHA allowed here)
         case [
             "pull",
-            "files",
+            "files" | "changes",
             fragment,
         ] if settings.pull_request_review_comments and (
             comment_id := _get_id_from_fragment(fragment, "r")
@@ -388,7 +388,7 @@ def _parse_loose_numberable_url(
                 commit_page=True,
             )
         # Pull request review comments on files page
-        case ["files", fragment] if (
+        case ["files" | "changes", fragment] if (
             settings.pull_request_review_comments
             and resource_type == "pull"
             and (comment_id := _get_id_from_fragment(parsed_url, "r"))
